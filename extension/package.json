@@ -14,7 +14,7 @@
     "sidepanel",
     "browser-automation"
   ],
-  "author": "",
+  "author": "Zeesu Royalist",
   "license": "MIT",
   "dependencies": {
     "clsx": "^2.1.1",
