@@ -33,7 +33,7 @@ describe('StorageService local fallback', () => {
 
   it('should provide default settings when storage is empty', async () => {
     const settings = await StorageService.getSettings();
-    expect(settings.backendUrl).toBe('http://localhost:3000');
+    expect(settings.geminiModel).toBe('gemini-3.5-flash-lite');
     expect(settings.theme).toBe('dark');
   });
 

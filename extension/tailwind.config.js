@@ -10,24 +10,24 @@ export default {
     extend: {
       colors: {
         pilot: {
-          bg: '#0A0B10',
-          panel: '#0F1118',
-          card: '#151722',
-          cardHover: '#1B1E2B',
-          border: '#23283B',
-          borderSubtle: '#1C2030',
-          primary: '#7C3AED',
-          primaryHover: '#6D28D9',
-          glow: '#8B5CF6',
-          cyan: '#06B6D4',
-          accent: '#6366F1',
-          success: '#10B981',
-          warning: '#F59E0B',
-          danger: '#EF4444',
+          bg: '#080302',           // Deep Ember Black
+          panel: '#140603',        // Elevated panel
+          card: 'rgba(0, 0, 0, 0.55)', // Frosted card
+          cardHover: 'rgba(255, 255, 255, 0.08)',
+          border: 'rgba(255, 255, 255, 0.12)',
+          borderSubtle: 'rgba(255, 255, 255, 0.06)',
+          borderStrong: 'rgba(249, 115, 22, 0.4)',
+          primary: '#EA580C',      // Fiery Orange
+          primaryHover: '#C2410C', // Dark Orange Hover
+          primaryText: '#FFFFFF',  // White text
+          accent: '#FB923C',       // Warm Amber Sparkle
+          success: '#10B981',      // Emerald Green
+          warning: '#F59E0B',      // Amber
+          danger: '#EF4444',       // Coral Red
           text: {
-            primary: '#F3F4F6',
-            secondary: '#9CA3AF',
-            muted: '#6B7280',
+            primary: '#FFFFFF',    // Pure White
+            secondary: 'rgba(255, 255, 255, 0.75)',
+            muted: 'rgba(255, 255, 255, 0.45)',
           }
         }
       },

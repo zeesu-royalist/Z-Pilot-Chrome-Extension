@@ -3,7 +3,6 @@ import {
   ChatMessage,
   BrowserAction,
   PageContext,
-  BackendHealth,
   UserSettings,
   UserProfile,
 } from './types/index.js';
@@ -11,6 +10,7 @@ import { StorageService } from './services/storage.js';
 import { ApiService } from './services/api.js';
 import { BrowserActionService } from './services/browser-actions.js';
 import { Header } from './components/Header.js';
+import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { ChatWindow } from './components/ChatWindow.js';
 import { ChatInput } from './components/ChatInput.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
@@ -22,10 +22,9 @@ export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isExecutingPlan, setIsExecutingPlan] = useState(false);
   const [pageContext, setPageContext] = useState<PageContext | null>(null);
-  const [health, setHealth] = useState<BackendHealth | null>(null);
-  const [checkingHealth, setCheckingHealth] = useState(false);
   const [settings, setSettings] = useState<UserSettings>({
-    backendUrl: 'http://localhost:3000',
+    geminiApiKey: '',
+    geminiModel: 'gemini-3.5-flash-lite',
     theme: 'dark',
     autoReadContext: true,
   });
@@ -35,8 +34,10 @@ export const App: React.FC = () => {
 
   // Cancellation ref for ongoing action sequence
   const cancelExecutionRef = useRef(false);
-  // Abort controller ref for ongoing backend request
+  // Abort controller ref for ongoing Gemini request
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const isApiKeyConfigured = !!(settings.geminiApiKey && settings.geminiApiKey.trim() !== '');
 
   // Initial load
   useEffect(() => {
@@ -51,9 +52,6 @@ export const App: React.FC = () => {
       setSettings(savedSettings);
       setProfile(savedProfile);
       setMessages(savedMessages);
-
-      // Check health
-      await checkBackend(savedSettings.backendUrl);
 
       // Refresh active tab context
       await refreshContext();
@@ -88,13 +86,6 @@ export const App: React.FC = () => {
       StorageService.saveMessages(messages);
     }
   }, [messages]);
-
-  const checkBackend = async (url: string) => {
-    setCheckingHealth(true);
-    const result = await ApiService.checkHealth(url);
-    setHealth(result);
-    setCheckingHealth(false);
-  };
 
   const refreshContext = async () => {
     try {
@@ -133,11 +124,11 @@ export const App: React.FC = () => {
       // Fallback to existing
     }
 
-    // Call backend API with cancellation signal
+    // Call API with cancellation signal
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    const response = await ApiService.sendChatMessage(settings.backendUrl, {
+    const response = await ApiService.sendChatMessage(settings, {
       message: messageText,
       history: [...messages, userMessage],
       pageContext: currentContext || undefined,
@@ -175,105 +166,110 @@ export const App: React.FC = () => {
 
     setMessages((prev) => [...prev, assistantMessage]);
 
-    // If an action plan is present and doesn't immediately wait for approval on step 0, execute it
-    if (initializedPlan && initializedPlan.actions.length > 0) {
-      const firstAction = initializedPlan.actions[0];
-      if (!firstAction.requiresApproval) {
-        executePlan(assistantMessageId, initializedPlan.actions);
-      }
+    // If an action plan exists and first action doesn't require manual approval, execute automatically
+    if (
+      initializedPlan &&
+      initializedPlan.actions.length > 0 &&
+      !initializedPlan.actions[0].requiresApproval
+    ) {
+      executePlan(assistantMessageId, initializedPlan.actions);
     }
   };
 
   /**
-   * Sequentially execute browser actions in a plan
+   * Execute an action sequence step-by-step
    */
-  const executePlan = async (messageId: string, actions: BrowserAction[]) => {
-    setIsExecutingPlan(false);
-    cancelExecutionRef.current = false;
-
-    const activeTab = await BrowserActionService.getActiveTab();
-    if (!activeTab || !activeTab.id) {
-      updateMessageAction(messageId, actions[0]?.id, {
-        status: 'failed',
-        resultMessage: 'No active browser tab found to perform action.',
-      });
-      return;
-    }
+  const executePlan = async (messageId: string, actionsToRun: BrowserAction[]) => {
+    if (isExecutingPlan || actionsToRun.length === 0) return;
 
     setIsExecutingPlan(true);
+    cancelExecutionRef.current = false;
 
-    for (let i = 0; i < actions.length; i++) {
+    // Get active tab ID
+    const activeTab = await BrowserActionService.getActiveTab();
+    const activeTabId = activeTab?.id || 0;
+
+    for (let i = 0; i < actionsToRun.length; i++) {
+      // Check cancellation signal
       if (cancelExecutionRef.current) {
-        // User cancelled
-        updateMessageAction(messageId, actions[i].id, {
-          status: 'cancelled',
-          resultMessage: 'Action cancelled by user.',
-        });
+        updateActionStatus(messageId, actionsToRun[i].id, 'cancelled', 'Execution cancelled by user');
         break;
       }
 
-      const currentAction = actions[i];
+      const currentAction = actionsToRun[i];
 
-      // If action requires approval and is not yet approved, pause and await user confirmation
+      // If action requires user approval and is not approved, stop execution and wait
       if (currentAction.requiresApproval && currentAction.status !== 'running') {
-        updateMessageAction(messageId, currentAction.id, {
-          status: 'awaiting_approval',
-        });
+        updateActionStatus(messageId, currentAction.id, 'awaiting_approval');
         setIsExecutingPlan(false);
-        return; // Pause execution until user clicks approve
+        return;
       }
 
-      // Mark running
-      updateMessageAction(messageId, currentAction.id, {
-        status: 'running',
-      });
+      // Mark current action as running
+      updateActionStatus(messageId, currentAction.id, 'running');
 
-      // Execute action
+      // Execute single action
       const result = await BrowserActionService.executeSingleAction(
         currentAction,
-        activeTab.id
+        activeTabId
       );
 
-      // Refresh page context after navigation or form actions
-      if (currentAction.type === 'NAVIGATE' || currentAction.type === 'SEARCH_YOUTUBE' || currentAction.type === 'FILL_FORM') {
-        await refreshContext();
+      // Check cancellation again
+      if (cancelExecutionRef.current) {
+        updateActionStatus(messageId, currentAction.id, 'cancelled', 'Execution cancelled by user');
+        break;
       }
 
       if (result.success) {
-        updateMessageAction(messageId, currentAction.id, {
-          status: 'completed',
-          resultMessage: result.message,
-        });
+        updateActionStatus(messageId, currentAction.id, 'completed', result.message);
       } else {
-        updateMessageAction(messageId, currentAction.id, {
-          status: 'failed',
-          resultMessage: result.message,
-        });
+        updateActionStatus(messageId, currentAction.id, 'failed', result.message);
+        // On failure, abort subsequent actions
+        for (let j = i + 1; j < actionsToRun.length; j++) {
+          updateActionStatus(
+            messageId,
+            actionsToRun[j].id,
+            'failed',
+            'Skipped due to earlier step failure'
+          );
+        }
+        break;
+      }
 
-        // Safe failure stop: do not continue subsequent actions if a prerequisite fails
-        setIsExecutingPlan(false);
-        return;
+      // Small pause between multiple steps
+      if (i < actionsToRun.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
       }
     }
 
     setIsExecutingPlan(false);
+    // Refresh context after plan completes
+    await refreshContext();
   };
 
   /**
-   * Helper to update status and resultMessage of a specific action inside a message
+   * Update the status of a specific action in a specific message
    */
-  const updateMessageAction = (
+  const updateActionStatus = (
     messageId: string,
     actionId: string,
-    updates: Partial<BrowserAction>
+    status: BrowserAction['status'],
+    resultMessage?: string
   ) => {
-    setMessages((prev) =>
-      prev.map((msg) => {
+    setMessages((prevMessages) =>
+      prevMessages.map((msg) => {
         if (msg.id !== messageId || !msg.plan) return msg;
 
-        const updatedActions = msg.plan.actions.map((act) =>
-          act.id === actionId ? { ...act, ...updates } : act
-        );
+        const updatedActions = msg.plan.actions.map((act) => {
+          if (act.id === actionId) {
+            return {
+              ...act,
+              status,
+              resultMessage: resultMessage || act.resultMessage,
+            };
+          }
+          return act;
+        });
 
         return {
           ...msg,
@@ -287,44 +283,43 @@ export const App: React.FC = () => {
   };
 
   /**
-   * Handle user approval of a sensitive action (e.g. form filling)
+   * User explicitly approves a flagged action
    */
-  const handleApproveAction = async (action: BrowserAction) => {
-    // Find the message containing this action
+  const handleApproveAction = (action: BrowserAction) => {
     const targetMsg = messages.find((m) =>
       m.plan?.actions.some((a) => a.id === action.id)
     );
     if (!targetMsg || !targetMsg.plan) return;
 
-    // Mark as running in UI state
-    updateMessageAction(targetMsg.id, action.id, { status: 'running' });
-
     const actionIndex = targetMsg.plan.actions.findIndex((a) => a.id === action.id);
-    // CRITICAL: Ensure the in-memory array passed to executePlan marks this approved action as running
+    if (actionIndex === -1) return;
+
     const remainingActions = targetMsg.plan.actions.slice(actionIndex).map((act, idx) =>
       idx === 0 ? { ...act, status: 'running' as const } : act
     );
 
+    // Update status in state immediately
+    updateActionStatus(targetMsg.id, action.id, 'running');
+
+    // Resume execution
     executePlan(targetMsg.id, remainingActions);
   };
 
   /**
-   * Handle user cancellation of a sensitive action
+   * User cancels a flagged action
    */
   const handleCancelAction = (action: BrowserAction) => {
     const targetMsg = messages.find((m) =>
       m.plan?.actions.some((a) => a.id === action.id)
     );
-    if (!targetMsg) return;
+    if (!targetMsg || !targetMsg.plan) return;
 
-    updateMessageAction(targetMsg.id, action.id, {
-      status: 'cancelled',
-      resultMessage: 'Action dismissed by user.',
-    });
+    updateActionStatus(targetMsg.id, action.id, 'cancelled', 'Rejected by user');
+    setIsExecutingPlan(false);
   };
 
   /**
-   * Stop currently running action sequence or ongoing network request
+   * User clicks Stop button while processing
    */
   const handleStopExecution = () => {
     cancelExecutionRef.current = true;
@@ -337,15 +332,7 @@ export const App: React.FC = () => {
   };
 
   /**
-   * Reset conversation to fresh state
-   */
-  const handleNewChat = async () => {
-    setMessages([]);
-    await StorageService.clearMessages();
-  };
-
-  /**
-   * Clear chat history from settings
+   * Clear chat history
    */
   const handleClearHistory = async () => {
     await StorageService.clearMessages();
@@ -354,63 +341,93 @@ export const App: React.FC = () => {
   };
 
   /**
-   * Save updated profile
-   */
-  const handleSaveProfile = async (updated: UserProfile) => {
-    setProfile(updated);
-    await StorageService.saveProfile(updated);
-  };
-
-  /**
-   * Save updated settings
+   * Update user settings
    */
   const handleUpdateSettings = async (updated: UserSettings) => {
     setSettings(updated);
     await StorageService.saveSettings(updated);
-    checkBackend(updated.backendUrl);
+  };
+
+  /**
+   * Save user autofill profile
+   */
+  const handleSaveProfile = async (newProfile: UserProfile) => {
+    setProfile(newProfile);
+    await StorageService.saveProfile(newProfile);
+  };
+
+  const handleSaveApiKey = async (apiKey: string) => {
+    const updated = { ...settings, geminiApiKey: apiKey };
+    setSettings(updated);
+    await StorageService.saveSettings(updated);
+  };
+
+  const handleNewChat = () => {
+    handleClearHistory();
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-pilot-bg text-pilot-text-primary overflow-hidden font-sans select-none">
-      {/* Header */}
+    <div
+      className={`flex flex-col h-screen w-full text-white overflow-hidden font-sans select-none relative transition-colors duration-500 ${
+        messages.length === 0 ? 'ember-bg-home' : 'ember-bg-chat'
+      }`}
+    >
+      {/* Header (Screenshot 1 in Home view, Screenshot 2 'Close chat' in Chat view) */}
       <Header
-        health={health}
-        checkingHealth={checkingHealth}
+        isApiKeyConfigured={isApiKeyConfigured}
+        geminiModel={settings.geminiModel}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onNewChat={handleNewChat}
+        hasMessages={messages.length > 0}
       />
 
-      {/* Main Chat Conversation Area */}
-      <ChatWindow
-        messages={messages}
-        isLoading={isLoading}
-        activeUrl={pageContext?.url}
-        currentPageTitle={pageContext?.title}
-        onSelectPrompt={(prompt) => handleSendMessage(prompt)}
-        onApproveAction={handleApproveAction}
-        onCancelAction={handleCancelAction}
-        isExecutingAction={isExecutingPlan}
-      />
+      {/* Main View: Screenshot 1 Home Screen vs Screenshot 2 Active Chat Stream */}
+      {messages.length === 0 ? (
+        <div className="flex-1 overflow-y-auto">
+          <WelcomeScreen
+            onSelectPrompt={(prompt: string) => handleSendMessage(prompt)}
+            currentPageTitle={pageContext?.title}
+            isApiKeyConfigured={isApiKeyConfigured}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onSaveApiKey={handleSaveApiKey}
+          />
+        </div>
+      ) : (
+        <>
+          {/* Main Chat Conversation Area (Screenshot 2) */}
+          <ChatWindow
+            messages={messages}
+            isLoading={isLoading}
+            activeUrl={pageContext?.url}
+            currentPageTitle={pageContext?.title}
+            isApiKeyConfigured={isApiKeyConfigured}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onSaveApiKey={handleSaveApiKey}
+            onSelectPrompt={(prompt) => handleSendMessage(prompt)}
+            onApproveAction={handleApproveAction}
+            onCancelAction={handleCancelAction}
+            isExecutingAction={isExecutingPlan}
+          />
 
-      {/* Fixed Bottom Input Bar */}
-      <ChatInput
-        input={input}
-        setInput={setInput}
-        onSend={() => handleSendMessage()}
-        onStop={handleStopExecution}
-        isLoading={isLoading || isExecutingPlan}
-        pageContext={pageContext}
-        disabled={checkingHealth}
-      />
+          {/* Floating Bottom Input Bar (Screenshot 2) */}
+          <ChatInput
+            input={input}
+            setInput={setInput}
+            onSend={() => handleSendMessage()}
+            onStop={handleStopExecution}
+            isLoading={isLoading || isExecutingPlan}
+            pageContext={pageContext}
+            disabled={false}
+          />
+        </>
+      )}
 
       {/* Settings Panel Modal */}
       <SettingsPanel
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        health={health}
-        checkingHealth={checkingHealth}
-        onRefreshHealth={() => checkBackend(settings.backendUrl)}
         settings={settings}
+        userProfile={profile}
         onUpdateSettings={handleUpdateSettings}
         onClearHistory={handleClearHistory}
         onOpenProfile={() => {
@@ -423,7 +440,10 @@ export const App: React.FC = () => {
       <ProfileModal
         profile={profile}
         isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
+        onClose={() => {
+          setIsProfileOpen(false);
+          setIsSettingsOpen(true);
+        }}
         onSave={handleSaveProfile}
       />
     </div>

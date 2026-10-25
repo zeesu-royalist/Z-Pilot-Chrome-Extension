@@ -7,7 +7,8 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
-  backendUrl: 'http://localhost:3000',
+  geminiApiKey: '',
+  geminiModel: 'gemini-3.5-flash-lite',
   theme: 'dark',
   autoReadContext: true,
 };

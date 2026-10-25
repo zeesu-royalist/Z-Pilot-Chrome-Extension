@@ -152,6 +152,14 @@ export const BrowserActionService = {
    */
   async executeSingleAction(action: BrowserAction, tabId: number): Promise<ActionResult> {
     try {
+      // Ensure valid tab ID
+      if (!tabId || tabId <= 0) {
+        const active = await this.getActiveTab();
+        if (active && active.id) {
+          tabId = active.id;
+        }
+      }
+
       switch (action.type) {
         case 'NAVIGATE': {
           let target = action.targetUrl?.trim();

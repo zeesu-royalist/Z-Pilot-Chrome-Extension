@@ -93,7 +93,6 @@ export function sanitizeAndValidatePlan(raw: unknown): {
 
   if (!parsed.success) {
     console.warn('[AgentPlanner] Schema validation failed:', parsed.error.issues);
-    // Graceful fallback response
     return {
       reply:
         typeof (raw as Record<string, unknown>)?.reply === 'string'
@@ -149,7 +148,6 @@ export function sanitizeAndValidatePlan(raw: unknown): {
         });
       }
     } else if (rawAction.type === 'NAVIGATE') {
-      // Navigation is low risk if it's standard search or video, medium if external arbitrary domain
       if (
         rawAction.targetUrl?.includes('youtube.com') ||
         rawAction.targetUrl?.includes('google.com')

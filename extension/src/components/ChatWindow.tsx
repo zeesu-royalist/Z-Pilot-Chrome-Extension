@@ -1,14 +1,17 @@
 import React, { useRef, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
 import { ChatMessage as ChatMessageType, BrowserAction } from '../types/index.js';
 import { ChatMessage } from './ChatMessage.js';
 import { WelcomeScreen } from './WelcomeScreen.js';
+import { BrandMark } from './BrandLogo.js';
 
 interface ChatWindowProps {
   messages: ChatMessageType[];
   isLoading: boolean;
   activeUrl?: string;
   currentPageTitle?: string;
+  isApiKeyConfigured?: boolean;
+  onOpenSettings?: () => void;
+  onSaveApiKey?: (apiKey: string) => void;
   onSelectPrompt: (prompt: string) => void;
   onApproveAction: (action: BrowserAction) => void;
   onCancelAction: (action: BrowserAction) => void;
@@ -20,6 +23,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   isLoading,
   activeUrl,
   currentPageTitle,
+  isApiKeyConfigured = false,
+  onOpenSettings,
+  onSaveApiKey,
   onSelectPrompt,
   onApproveAction,
   onCancelAction,
@@ -44,6 +50,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         <WelcomeScreen
           onSelectPrompt={onSelectPrompt}
           currentPageTitle={currentPageTitle}
+          isApiKeyConfigured={isApiKeyConfigured}
+          onOpenSettings={onOpenSettings}
+          onSaveApiKey={onSaveApiKey}
         />
       </div>
     );
@@ -62,15 +71,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           onApproveAction={onApproveAction}
           onCancelAction={onCancelAction}
           onSelectPrompt={onSelectPrompt}
+          onOpenSettings={onOpenSettings}
           isExecutingAction={isExecutingAction}
         />
       ))}
 
-      {/* AI Processing Bubble */}
+      {/* AI Processing Status */}
       {isLoading && (
-        <div className="flex items-center space-x-2 text-pilot-text-muted text-xs p-2 animate-fade-in">
-          <Loader2 className="w-4 h-4 animate-spin text-pilot-primary" />
-          <span>Z-Pilot is thinking and planning actions...</span>
+        <div className="flex items-center space-x-2 text-white/50 text-xs px-2 py-1.5 animate-fade-in">
+          <BrandMark size={16} className="object-contain animate-pulse shrink-0" />
+          <span className="font-light italic tracking-wide">Z-Pilot is working....</span>
         </div>
       )}
     </div>

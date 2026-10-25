@@ -110,21 +110,10 @@ export interface UserProfile {
 }
 
 export interface UserSettings {
-  backendUrl: string;
+  geminiApiKey?: string;
+  geminiModel?: string;
   theme: 'dark' | 'light';
   autoReadContext: boolean;
-}
-
-export interface BackendHealth {
-  status: string;
-  service: string;
-  version: string;
-  uptimeSeconds: number;
-  gemini: {
-    configured: boolean;
-    model: string;
-    status: string;
-  };
 }
 
 export interface ActionResult {

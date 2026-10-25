@@ -8,10 +8,10 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
-  /* Custom sleek scrollbar for side panel */
+  /* Sleek minimalist scrollbar matching Ember Flame palette */
   ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
+    width: 4px;
+    height: 4px;
   }
 
   ::-webkit-scrollbar-track {
@@ -19,11 +19,32 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #23283b;
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed;
+    background: #EA580C;
+  }
+
+  ::selection {
+    background: rgba(234, 88, 12, 0.4);
+    color: #FFFFFF;
+  }
+
+  /* Radiant Ember Home Background (from Screenshot 1) */
+  .ember-bg-home {
+    background: radial-gradient(130% 90% at 50% -10%, #FF6B00 0%, #EA580C 30%, #9A3412 60%, #2A0903 85%, #080201 100%);
+  }
+
+  /* Dark Aura Vignette Chat Background (from Screenshot 2) */
+  .ember-bg-chat {
+    background: radial-gradient(ellipse 110% 95% at 50% 50%, #050201 15%, #140502 55%, #5A1705 85%, #9A2803 100%);
+  }
+
+  /* Fiery Orange User Message Bubble (from Screenshot 2) */
+  .user-bubble-ember {
+    background: linear-gradient(135deg, #D95B16 0%, #EA580C 50%, #F97316 100%);
+    box-shadow: 0 4px 14px rgba(234, 88, 12, 0.35);
   }
 }

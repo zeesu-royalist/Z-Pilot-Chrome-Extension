@@ -1,93 +1,97 @@
 import React from 'react';
-import { Sparkles, Settings, Plus } from 'lucide-react';
-import { BackendHealth } from '../types/index.js';
+import { Settings, X, User, Home } from 'lucide-react';
+import { BrandMark } from './BrandLogo.js';
 
 interface HeaderProps {
-  health: BackendHealth | null;
-  checkingHealth: boolean;
+  isApiKeyConfigured?: boolean;
+  geminiModel?: string;
   onOpenSettings: () => void;
   onNewChat: () => void;
+  hasMessages?: boolean;
+  websiteUrl?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  health,
-  checkingHealth,
   onOpenSettings,
   onNewChat,
+  hasMessages = false,
+  websiteUrl = 'https://zeesu-royalist.vercel.app',
 }) => {
-  const isConnected = !!health;
-  const isGeminiReady = health?.gemini.configured ?? false;
+  const handleOpenWebsite = () => {
+    if (websiteUrl) {
+      window.open(websiteUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
 
+  // If active chat is open, show Home button on left, Close chat in center, Settings on right
+  if (hasMessages) {
+    return (
+      <header className="flex items-center justify-between px-4 py-3 sticky top-0 z-20 backdrop-blur-sm">
+        {/* Left Home Button */}
+        <button
+          onClick={onNewChat}
+          title="Back to Home"
+          className="w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/60 border border-white/15 text-white/80 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-sm active:scale-95"
+        >
+          <Home className="w-4 h-4 stroke-[1.75]" />
+        </button>
+
+        {/* Centered "✕ Close chat" pill */}
+        <button
+          onClick={onNewChat}
+          title="Close chat and return home"
+          className="px-4 py-1.5 rounded-full bg-black/50 hover:bg-black/70 border border-white/15 text-xs text-white/90 hover:text-white flex items-center space-x-1.5 backdrop-blur-md transition-all cursor-pointer shadow-lg shadow-black/40 active:scale-95"
+        >
+          <X className="w-3.5 h-3.5 text-white/70" />
+          <span className="font-medium">Close chat</span>
+        </button>
+
+        {/* Right Settings Button */}
+        <button
+          onClick={onOpenSettings}
+          title="Settings & API Key"
+          className="w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/60 border border-white/15 text-white/80 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+        >
+          <Settings className="w-4 h-4 stroke-[1.75]" />
+        </button>
+      </header>
+    );
+  }
+
+  // Home view top bar (from Screenshot 1)
   return (
-    <header className="flex items-center justify-between px-4 py-3 border-b border-pilot-border/80 bg-pilot-panel/90 backdrop-blur-md sticky top-0 z-20">
-      {/* Brand logo & name */}
+    <header className="flex items-center justify-between px-4 py-3 sticky top-0 z-20">
+      {/* Brand logo & "Z-Pilot, Welcome back" (No circle border wrapper) */}
       <div className="flex items-center space-x-2.5">
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-pilot-primary to-pilot-accent flex items-center justify-center shadow-lg shadow-pilot-primary/20">
-          <Sparkles className="w-4 h-4 text-white" />
-        </div>
-        <div>
-          <div className="flex items-center space-x-2">
-            <span className="font-semibold text-sm tracking-wide text-pilot-text-primary">
-              Z-Pilot
-            </span>
-            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-pilot-border text-pilot-text-secondary">
-              AI Agent
-            </span>
-          </div>
+        <BrandMark size={32} className="object-contain shrink-0" />
+        <div className="flex flex-col">
+          <span className="font-semibold text-sm tracking-tight text-white leading-tight">
+            Z-Pilot,
+          </span>
+          <span className="text-xs text-white/70 font-normal">
+            Browser Agent
+          </span>
         </div>
       </div>
 
-      {/* Status indicator & Actions */}
+      {/* Right Circular Frosted Buttons */}
       <div className="flex items-center space-x-2">
-        {/* Connection status badge */}
-        <div
-          title={
-            checkingHealth
-              ? 'Checking backend...'
-              : !isConnected
-              ? 'Backend disconnected'
-              : !isGeminiReady
-              ? 'Gemini API key missing in backend/.env'
-              : `Connected (${health?.gemini.model})`
-          }
-          className="flex items-center space-x-1.5 px-2 py-1 rounded-full bg-pilot-card border border-pilot-border text-[11px]"
-        >
-          <span
-            className={`w-2 h-2 rounded-full ${
-              checkingHealth
-                ? 'bg-pilot-warning animate-pulse'
-                : isConnected && isGeminiReady
-                ? 'bg-pilot-success shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                : 'bg-pilot-danger'
-            }`}
-          />
-          <span className="text-pilot-text-secondary text-[11px] hidden sm:inline">
-            {checkingHealth
-              ? 'Checking...'
-              : isConnected && isGeminiReady
-              ? 'Ready'
-              : !isConnected
-              ? 'Offline'
-              : 'Config Key'}
-          </span>
-        </div>
-
-        {/* New Chat Button */}
+        {/* User Website button (next to Settings) */}
         <button
-          onClick={onNewChat}
-          title="Start new conversation"
-          className="p-1.5 rounded-lg text-pilot-text-secondary hover:text-pilot-text-primary hover:bg-pilot-card transition-colors border border-transparent hover:border-pilot-border"
+          onClick={handleOpenWebsite}
+          title="Visit Creator Website (zeesu-royalist.vercel.app)"
+          className="w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-sm active:scale-95"
         >
-          <Plus className="w-4 h-4" />
+          <User className="w-4 h-4 stroke-[1.75]" />
         </button>
 
-        {/* Settings Button */}
+        {/* Menu / Settings Button */}
         <button
           onClick={onOpenSettings}
-          title="Open settings"
-          className="p-1.5 rounded-lg text-pilot-text-secondary hover:text-pilot-text-primary hover:bg-pilot-card transition-colors border border-transparent hover:border-pilot-border"
+          title="Settings & API Key"
+          className="w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-sm active:scale-95"
         >
-          <Settings className="w-4 h-4" />
+          <Settings className="w-4 h-4 stroke-[1.75]" />
         </button>
       </div>
     </header>
