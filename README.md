@@ -165,7 +165,6 @@ Z-Pilot/
 │   │   │   └── storage.ts           # chrome.storage.local wrapper
 │   │   ├── styles.css               # Ember Flame design system
 │   │   └── App.tsx                  # Main application orchestrator
-│   ├── tests/                       # Unit tests (Planner & Actions)
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vite.config.ts
@@ -180,26 +179,7 @@ Z-Pilot/
 * **Styling:** [Tailwind CSS](https://tailwindcss.com/) with a curated Ember Flame color palette (`#EA580C`, `#F97316`, `#FB923C`) and dark glassmorphic styling
 * **Icons:** [Lucide React](https://lucide.dev/) with optically balanced alignment
 * **Bundler:** [Vite 6](https://vitejs.dev/) with Rollup extension build pipeline
-* **Testing:** [Vitest](https://vitest.dev/) (14/14 automated tests passing)
 * **AI Model Support:** `gemini-3.5-flash-lite` (Default & Fastest), `gemini-3.5-flash`, `gemini-2.5-flash-lite` with automatic fallback
-
----
-
-## 🧪 Running Automated Tests
-
-To run the automated security validation and browser action tests:
-
-```bash
-cd extension
-npm test
-```
-
-```text
-✓ tests/browser-actions.test.ts (8 tests)
-✓ tests/planner-client.test.ts (6 tests)
-Test Files  2 passed (2)
-Tests       14 passed (14)
-```
 
 ---
 
