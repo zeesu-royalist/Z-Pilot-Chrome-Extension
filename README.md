@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v1.0.0.zip"><img src="https://img.shields.io/badge/⬇️_Direct_Download-Ready_to_Install_(ZIP)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Direct Download"></a>
   <a href="#-key-features"><img src="https://img.shields.io/badge/Manifest-V3_Ready-orange?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Manifest V3"></a>
   <a href="#-architecture--privacy-first"><img src="https://img.shields.io/badge/Architecture-100%25_Client--Side-black?style=for-the-badge&logo=shield&logoColor=orange" alt="Client Side Privacy"></a>
   <a href="https://aistudio.google.com/"><img src="https://img.shields.io/badge/AI_Engine-Google_Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Google Gemini"></a>
@@ -71,39 +72,52 @@ flowchart LR
 
 ---
 
-## 🚀 Quick Start (Setup in Under 2 Minutes)
+## 🚀 Installation & Setup
 
-### Step 1: Clone & Build Extension
+### ⚡ Option 1: Instant Install (No Coding / No Node.js Needed!) — Recommended
+
+For users who want to install and use Z-Pilot immediately without touching any code or terminal:
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v1.0.0.zip">
+    <img src="https://img.shields.io/badge/⬇️_DOWNLOAD_Z--PILOT_(ZIP)-Click_Here_to_Download-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Download Z-Pilot Extension ZIP" height="42" />
+  </a>
+</p>
+
+#### 3-Step Setup:
+1. **Download & Extract:** 
+   Click the button above to download **`z-pilot-v1.0.0.zip`**. Unzip it on your computer — you will get a folder named **`z-pilot-extension`**.
+2. **Open Extensions in Chrome or Brave:**
+   - Navigate to `chrome://extensions` (or `brave://extensions`).
+   - Turn **ON** the **Developer mode** toggle in the top-right corner.
+3. **Load Extension:**
+   - Click the **"Load unpacked"** button in the top-left corner.
+   - Select the unzipped **`z-pilot-extension`** folder.
+   - 🎉 **Done!** Click the puzzle icon (🧩) in your browser toolbar and **Pin 📌 Z-Pilot** to your browser.
+
+---
+
+### 🛠️ Option 2: Build from Source (For Developers)
+
+If you would like to inspect, customize, or contribute to the code:
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension.git
 cd Z-Pilot-Chrome-Extension/extension
 
-# Install dependencies
+# 2. Install dependencies
 npm install
 
-# Build the production bundle
+# 3. Build the production bundle
 npm run build
 ```
 
-✅ This creates a ready-to-load folder at `extension/dist`.
+Then load the generated **`extension/dist`** folder via `chrome://extensions` using **Load unpacked**.
 
 ---
 
-### Step 2: Load into Chrome or Brave
-
-1. Open your browser and navigate to:
-   - **Chrome:** `chrome://extensions`
-   - **Brave:** `brave://extensions`
-2. Toggle **Developer mode** on (top-right corner).
-3. Click the **Load unpacked** button (top-left).
-4. Select the **`Z-Pilot/extension/dist`** folder.
-5. Click the Extensions menu (puzzle icon 🧩) and **Pin Z-Pilot 📌** to your toolbar.
-
----
-
-### Step 3: Connect Free Gemini API Key
+### 🔑 Connecting Your Free Gemini API Key
 
 1. Click the **Z-Pilot** icon in your toolbar to open the Side Panel.
 2. Click **Get free key** or click the **Settings ⚙️** icon in the top right.
@@ -139,6 +153,8 @@ Open any website, click Z-Pilot in the side panel, and try:
 
 ```text
 Z-Pilot/
+├── release/                         # 📦 Pre-packaged ready-to-install ZIP
+│   └── z-pilot-v1.0.0.zip
 ├── extension/                       # 🚀 Chrome Extension (Manifest V3)
 │   ├── public/
 │   │   ├── icons/                   # Extension icons (16, 32, 48, 128px)
