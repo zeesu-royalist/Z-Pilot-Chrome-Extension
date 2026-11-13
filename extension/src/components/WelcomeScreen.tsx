@@ -129,7 +129,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   const appLauncherItems = [
     {
       id: 'notes',
-      label: 'Quick notes',
+      label: 'Notes',
       icon: NotebookPen,
       onClick: onOpenQuickNotes,
       badge: notesCount > 0 ? (notesCount > 9 ? '9+' : String(notesCount)) : undefined,
@@ -169,7 +169,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     },
     {
       id: 'chat',
-      label: 'Friend Chat',
+      label: 'Chat',
       icon: MessageCircle,
       onClick: onOpenChat,
       badge: 'PIN',
@@ -177,7 +177,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     },
     {
       id: 'shield',
-      label: 'Z-Shield',
+      label: 'Ad Blocker',
       icon: ShieldCheck,
       onClick: onOpenAdBlocker,
       badge: blockedAdsCount > 0 ? (blockedAdsCount > 99 ? '99+' : String(blockedAdsCount)) : 'ON',
@@ -185,7 +185,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     },
     {
       id: 'video',
-      label: 'Video Scan',
+      label: 'Videos',
       icon: Film,
       onClick: onOpenVideoScanner,
       badge: detectedVideoCount > 0 ? (detectedVideoCount > 9 ? '9+' : String(detectedVideoCount)) : undefined,
@@ -202,28 +202,35 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col justify-between min-h-full px-4 pt-5 pb-5 text-left animate-fade-in font-sans gap-4">
+    <div className="flex flex-col justify-between min-h-full px-4 pt-3 pb-4 font-sans animate-fade-in overflow-y-auto no-scrollbar gap-4">
       {/* Top Hero Section */}
       <div className="space-y-4">
-        {/* Hero Title */}
-        <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight text-white leading-[1.2]">
-            How can I help<br />
-            you to browse today ?
+        {/* Hero Title & Browsing Context */}
+        <div className="pt-1">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-tight">
+            How can I help<br />you to browse today ?
           </h1>
+          {currentPageTitle && (
+            <div className="flex items-center space-x-1.5 text-[11px] text-zinc-400 mt-1 truncate">
+              <Globe className="w-3 h-3 text-zinc-500 shrink-0" />
+              <span className="truncate">{currentPageTitle}</span>
+            </div>
+          )}
         </div>
 
         {/* 🚀 First-Time Quick Setup Box (if API key not set) */}
         {!isApiKeyConfigured && (
-          <div className="w-full p-4 rounded-2xl bg-black/60 border border-orange-500/30 text-left shadow-2xl backdrop-blur-xl animate-fade-in">
-            <div className="flex items-center space-x-2 mb-2">
-              <Key className="w-4 h-4 text-orange-400 shrink-0" />
+          <div className="w-full p-4 rounded-2xl bg-[#121214]/90 border border-orange-500/25 text-left shadow-xl backdrop-blur-xl animate-fade-in space-y-3">
+            <div className="flex items-center space-x-2">
+              <div className="w-7 h-7 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                <Key className="w-3.5 h-3.5 stroke-[2]" />
+              </div>
               <span className="text-xs font-semibold text-white tracking-wide">
                 Activate Your Assistant
               </span>
             </div>
 
-            <p className="text-[11px] text-white/70 mb-3 leading-relaxed">
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
               Enter your free Google Gemini API Key. Stored securely on your device:
             </p>
 
@@ -238,13 +245,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   }}
                   placeholder="Paste Gemini API key here..."
                   autoFocus
-                  className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-black/50 border border-white/15 text-xs text-white placeholder-white/40 focus:outline-none focus:border-orange-400 font-mono text-[11px] transition-all"
+                  className="w-full pl-3 pr-10 py-2.5 rounded-xl bg-black/40 border border-white/10 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-400/60 font-mono text-[11px] transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowKey(!showKey)}
                   tabIndex={-1}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
                 >
                   {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
@@ -271,10 +278,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
             {feedback && (
               <div
-                className={`mt-2.5 p-2 rounded-lg text-[11px] flex items-start space-x-1.5 ${feedback.success
+                className={`p-2 rounded-lg text-[11px] flex items-start space-x-1.5 ${
+                  feedback.success
                     ? 'bg-orange-950/40 border border-orange-500/30 text-orange-200'
                     : 'bg-rose-950/40 border border-rose-500/30 text-rose-300'
-                  }`}
+                }`}
               >
                 {feedback.success ? (
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-orange-400" />
@@ -285,27 +293,27 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               </div>
             )}
 
-            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px]">
+            <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
               <div className="flex items-center space-x-1.5">
                 <a
                   href="https://aistudio.google.com/app/apikey"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-orange-300 hover:text-white underline inline-flex items-center space-x-1"
+                  className="text-orange-400 hover:text-orange-300 underline inline-flex items-center space-x-1"
                 >
                   <span>Get free key</span>
                   <ExternalLink className="w-2.5 h-2.5" />
                 </a>
 
-                {/* Circular (i) info button */}
                 <button
                   type="button"
                   onClick={() => setShowQuickGuide(!showQuickGuide)}
                   title={showQuickGuide ? 'Hide instructions' : 'How to get an API key step-by-step'}
-                  className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all cursor-pointer ${showQuickGuide
+                  className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
+                    showQuickGuide
                       ? 'bg-orange-500 text-white border-orange-400'
                       : 'bg-white/5 hover:bg-orange-500/20 text-orange-400 border-orange-500/30'
-                    }`}
+                  }`}
                 >
                   <Info className="w-3 h-3" />
                 </button>
@@ -315,27 +323,26 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <button
                   type="button"
                   onClick={onOpenSettings}
-                  className="text-white/60 hover:text-white transition-colors cursor-pointer"
+                  className="text-zinc-500 hover:text-white transition-colors cursor-pointer"
                 >
                   Settings
                 </button>
               )}
             </div>
 
-            {/* Expandable Step-by-Step API Key Guide */}
             {showQuickGuide && (
-              <div className="mt-2.5 p-2.5 rounded-xl bg-orange-950/25 border border-orange-500/30 text-[11px] text-white/80 space-y-1.5 animate-fade-in">
-                <div className="font-semibold text-white text-[11px] pb-1 border-b border-orange-500/20 flex items-center justify-between">
+              <div className="mt-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-[11px] text-zinc-300 space-y-1.5">
+                <div className="font-semibold text-white text-[11px] pb-1 border-b border-white/[0.06] flex items-center justify-between">
                   <span>4 Easy Steps to Get Your Free Key:</span>
                   <button
                     type="button"
                     onClick={() => setShowQuickGuide(false)}
-                    className="text-white/40 hover:text-white text-xs cursor-pointer"
+                    className="text-zinc-500 hover:text-white text-xs cursor-pointer"
                   >
                     ✕
                   </button>
                 </div>
-                <ol className="space-y-1 list-none text-white/80">
+                <ol className="space-y-1 list-none text-zinc-400">
                   <li className="flex items-start space-x-1.5">
                     <span className="w-3.5 h-3.5 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 text-[9px] flex items-center justify-center shrink-0 mt-0.5 font-bold">1</span>
                     <span>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-orange-400 underline">Google AI Studio</a>.</span>
@@ -353,7 +360,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                     <span>Copy &amp; paste it above, then click <strong>&quot;Connect &amp; Start&quot;</strong>!</span>
                   </li>
                 </ol>
-                <div className="text-[10px] text-white/50 pt-1 border-t border-orange-500/15">
+                <div className="text-[10px] text-zinc-500 pt-1 border-t border-white/[0.06]">
                   ✓ 100% Free • No credit card required
                 </div>
               </div>
@@ -361,59 +368,69 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </div>
         )}
 
-        {/* 🔧 App Launcher — 4×2 dark premium tiles */}
-        <div className="grid grid-cols-4 gap-2.5">
-          {appLauncherItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={item.onClick}
-              title={item.title}
-              className="relative flex flex-col items-start p-3 rounded-2xl bg-black/50 hover:bg-black/70 border border-white/[0.08] hover:border-orange-500/30 backdrop-blur-md text-left transition-all group cursor-pointer active:scale-95 shadow-sm min-h-[90px] focus:outline-none"
-            >
-              {/* Badge */}
-              {item.badge !== undefined && (
-                <span className="absolute top-2 right-2 min-w-[18px] h-[16px] px-1 rounded-full bg-orange-500/80 text-[9px] font-bold text-white flex items-center justify-center font-mono leading-none">
-                  {item.badge}
+        {/* ── Quick Tools Dock (4x2 Sleek App Launcher) ── */}
+        <div>
+          <div className="flex items-center justify-between px-0.5 mb-2">
+            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+              Quick Tools
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {appLauncherItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={item.onClick}
+                title={item.title}
+                className="relative flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] hover:border-orange-500/30 transition-all cursor-pointer group active:scale-95 text-center focus:outline-none"
+              >
+                {item.badge !== undefined && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-orange-500 text-[9px] font-bold text-white flex items-center justify-center font-mono leading-none shadow-sm">
+                    {item.badge}
+                  </span>
+                )}
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 group-hover:text-orange-400 transition-colors">
+                  <item.icon className="w-4 h-4 stroke-[1.8]" />
+                </div>
+                <span className="text-[11px] font-medium text-zinc-300 group-hover:text-white mt-0.5 leading-tight truncate max-w-full px-0.5 transition-colors">
+                  {item.label}
                 </span>
-              )}
-              {/* Icon */}
-              <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 group-hover:text-orange-300 group-hover:bg-orange-500/20 transition-all mb-auto">
-                <item.icon className="w-4 h-4 stroke-[1.75]" />
-              </div>
-              {/* Label */}
-              <span className="text-[11px] font-semibold text-white/80 group-hover:text-white mt-2 leading-tight w-full truncate transition-colors">
-                {item.label}
-              </span>
-            </button>
-          ))}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* 💬 Prompt suggestion cards — 2×2 large premium dark */}
-        <div className="grid grid-cols-2 gap-2.5">
-          {promptCards.map((card, idx) => {
-            const IconComponent = card.icon;
-            return (
-              <button
-                key={idx}
-                onClick={() => onSelectPrompt(card.prompt)}
-                className="p-4 rounded-2xl bg-black/50 hover:bg-black/70 border border-white/[0.08] hover:border-orange-500/25 backdrop-blur-md text-left transition-all group cursor-pointer shadow-sm flex flex-col justify-between min-h-[110px] active:scale-95 focus:outline-none"
-              >
-                <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 group-hover:text-orange-300 group-hover:bg-orange-500/20 transition-all">
-                  <IconComponent className="w-4 h-4 stroke-[1.75]" />
-                </div>
-                <div className="text-[13px] font-semibold text-white/90 leading-snug group-hover:text-white transition-colors">
-                  {card.title}
-                </div>
-              </button>
-            );
-          })}
+        {/* ── Suggested Actions (2x2 Reference Matching Cards) ── */}
+        <div>
+          <div className="flex items-center justify-between px-0.5 mb-2">
+            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+              Suggested Actions
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            {promptCards.map((card, idx) => {
+              const IconComponent = card.icon;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => onSelectPrompt(card.prompt)}
+                  className="p-3.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] hover:border-orange-500/30 text-left transition-all group cursor-pointer shadow-sm flex flex-col justify-between min-h-[92px] active:scale-[0.98] focus:outline-none"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 group-hover:text-orange-300 group-hover:bg-orange-500/20 transition-all">
+                    <IconComponent className="w-4 h-4 stroke-[1.75]" />
+                  </div>
+                  <div className="text-xs sm:text-[13px] font-semibold text-white/90 leading-snug group-hover:text-white transition-colors mt-2">
+                    {card.title}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Bottom Input Card — matches reference image */}
-      <div className="mt-2 rounded-3xl bg-[#111]/90 backdrop-blur-xl border border-white/[0.07] p-4 shadow-2xl">
-        {/* Textarea */}
+      {/* ── Bottom Input Bar (Reference Matching Command Box) ── */}
+      <div className="mt-2 rounded-3xl bg-[#121214]/95 backdrop-blur-xl border border-white/[0.08] p-4 shadow-2xl">
         <form onSubmit={handleHomeSubmit}>
           <textarea
             value={homeInput}
@@ -426,27 +443,24 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             }}
             rows={2}
             placeholder="Ask anything about this page, fill forms, or search web..."
-            className="w-full bg-transparent resize-none text-[13px] text-white placeholder-white/35 focus:outline-none leading-relaxed font-sans"
+            className="w-full bg-transparent resize-none text-[13px] text-white placeholder-zinc-500 focus:outline-none leading-relaxed font-sans"
           />
         </form>
 
-        {/* Toolbar row */}
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/[0.06]">
           <div className="flex items-center space-x-2">
-            {/* Paperclip */}
             <div
               title={currentPageTitle ? `Active context: ${currentPageTitle}` : 'Attach context'}
-              className="w-9 h-9 rounded-full bg-white/[0.07] hover:bg-white/15 border border-white/[0.07] flex items-center justify-center text-white/60 hover:text-white/90 transition-all cursor-pointer"
+              className="w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/10 border border-white/[0.08] flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
             >
-              <Paperclip className="w-4 h-4 stroke-[1.75]" />
+              <Paperclip className="w-3.5 h-3.5 stroke-[1.75]" />
             </div>
 
-            {/* Model Selector Pill */}
             <button
               type="button"
               onClick={onOpenSettings}
               title="Change Gemini Model"
-              className="px-3.5 py-2 rounded-full bg-white/[0.07] hover:bg-white/15 border border-white/[0.07] text-[12px] font-medium text-white/70 hover:text-white flex items-center space-x-1.5 transition-all cursor-pointer"
+              className="px-3 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/10 border border-white/[0.08] text-xs font-medium text-zinc-300 hover:text-white flex items-center space-x-1.5 transition-all cursor-pointer"
             >
               <span>
                 {geminiModel.includes('2.5')
@@ -455,18 +469,17 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                     ? 'Flash 3.5 Lite'
                     : 'Flash 3.5'}
               </span>
-              <span className="text-[10px] text-white/40">▾</span>
+              <span className="text-[10px] text-zinc-500">▾</span>
             </button>
           </div>
 
-          {/* Send Button */}
           <button
             type="button"
             onClick={() => handleHomeSubmit()}
             title="Send message"
-            className="w-11 h-11 rounded-full bg-gradient-to-tr from-[#EA580C] to-[#F97316] hover:from-[#F97316] hover:to-[#FB923C] text-white flex items-center justify-center shadow-lg shadow-orange-600/50 hover:shadow-orange-500/60 transition-all cursor-pointer active:scale-90"
+            className="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white flex items-center justify-center shadow-lg shadow-orange-600/40 hover:shadow-orange-500/50 transition-all cursor-pointer active:scale-90"
           >
-            <SendHorizontal className="w-5 h-5 stroke-[2.2] translate-x-[1px]" />
+            <SendHorizontal className="w-4 h-4 stroke-[2.2] translate-x-[0.5px]" />
           </button>
         </div>
       </div>

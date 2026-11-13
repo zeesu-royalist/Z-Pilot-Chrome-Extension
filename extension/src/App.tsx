@@ -67,7 +67,7 @@ export const App: React.FC = () => {
   // Friend Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Z-Shield Ad Blocker State
+  // Add Blocker Ad Blocker State
   const [isAdBlockerOpen, setIsAdBlockerOpen] = useState(false);
   const [blockedAdsCount, setBlockedAdsCount] = useState(0);
 
@@ -641,9 +641,8 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className={`flex flex-col h-screen w-full text-white overflow-hidden font-sans select-none relative transition-colors duration-500 ${
-        messages.length === 0 ? 'ember-bg-home' : 'ember-bg-chat'
-      }`}
+      className={`flex flex-col h-screen w-full text-white overflow-hidden font-sans select-none relative transition-colors duration-500 ${messages.length === 0 ? 'ember-bg-home' : 'ember-bg-chat'
+        }`}
     >
       {/* Header (Screenshot 1 in Home view, Screenshot 2 'Close chat' in Chat view) */}
       <Header
@@ -797,7 +796,7 @@ export const App: React.FC = () => {
         onClose={() => setIsChatOpen(false)}
       />
 
-      {/* Z-Shield Ad Blocker Panel */}
+      {/* Add Blocker Ad Blocker Panel */}
       <AdBlockerPanel
         isOpen={isAdBlockerOpen}
         onClose={() => setIsAdBlockerOpen(false)}

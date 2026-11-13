@@ -159,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenAdBlocker && (
             <button
               onClick={onOpenAdBlocker}
-              title="Z-Shield Ad Blocker"
+              title="Add Blocker Ad Blocker"
               className="relative w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-orange-600/30 border border-white/15 hover:border-orange-500/50 text-white/85 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
             >
               <Shield className="w-4 h-4 stroke-[1.75]" />
@@ -198,37 +198,37 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Home view — premium minimal header
   return (
-    <header className="flex items-center justify-between px-4 py-3.5 sticky top-0 z-20">
-      {/* Brand — just logo + text, no box */}
+    <header className="flex items-center justify-between px-4 py-3 sticky top-0 z-20 backdrop-blur-md border-b border-white/[0.04]">
+      {/* Brand — logo + badge */}
       <div className="flex items-center space-x-2.5">
-        <BrandMark size={30} className="object-contain shrink-0" />
-        <div className="flex flex-col leading-tight">
-          <span className="font-bold text-[13px] tracking-tight text-white leading-tight">
-            Z-Pilot,
+        <BrandMark size={26} className="object-contain shrink-0" />
+        <div className="flex items-center space-x-2">
+          <span className="font-bold text-sm tracking-tight text-white">
+            Z-Pilot
           </span>
-          <span className="text-[11px] text-white/50 font-normal leading-tight">
+          <span className="text-[10px] font-medium text-zinc-400 bg-white/[0.05] border border-white/[0.08] px-2 py-0.5 rounded-full">
             Browser Agent
           </span>
         </div>
       </div>
 
-      {/* Right: User + Settings — dark frosted pill */}
-      <div className="flex items-center space-x-1 bg-white/[0.07] border border-white/[0.08] p-1 rounded-2xl">
+      {/* Right: User + Settings — sleek minimal pill */}
+      <div className="flex items-center space-x-1 bg-white/[0.04] border border-white/[0.08] p-1 rounded-xl">
         <button
           type="button"
           onClick={handleOpenWebsite}
           title="Visit Creator Website"
-          className="w-8 h-8 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer active:scale-90"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer active:scale-95"
         >
-          <User className="w-4 h-4 stroke-[1.75]" />
+          <User className="w-3.5 h-3.5 stroke-[1.8]" />
         </button>
         <button
           type="button"
           onClick={onOpenSettings}
           title="Settings & API Key"
-          className="w-8 h-8 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer active:scale-90"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer active:scale-95"
         >
-          <Settings className="w-4 h-4 stroke-[1.75]" />
+          <Settings className="w-3.5 h-3.5 stroke-[1.8]" />
         </button>
       </div>
     </header>

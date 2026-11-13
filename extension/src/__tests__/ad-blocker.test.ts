@@ -8,7 +8,7 @@ import {
   AdBlockerService,
 } from '../services/ad-blocker.js';
 
-describe('Z-Shield Ad Blocker Rules & Service', () => {
+describe('Add Blocker Ad Blocker Rules & Service', () => {
   beforeEach(() => {
     localStorage.clear();
   });

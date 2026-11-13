@@ -263,7 +263,7 @@ function reportBlockedCount(count: number): void {
           count,
           domain: window.location.hostname,
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   } catch {
     // Ignore
@@ -271,7 +271,7 @@ function reportBlockedCount(count: number): void {
 }
 
 /**
- * Initialize Z-Shield on the active webpage
+ * Initialize Add Blocker on the active webpage
  */
 export function initAdShield(enabled = true): void {
   isShieldActive = enabled;

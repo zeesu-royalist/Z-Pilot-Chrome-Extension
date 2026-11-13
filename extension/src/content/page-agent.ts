@@ -14,7 +14,7 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
 
   console.log('[Z-Pilot] Page Agent active on:', window.location.href);
 
-  // ── Auto-initialize Z-Shield Ad Blocker (Defaults to enabled) ──
+  // ── Auto-initialize Add Blocker Ad Blocker (Defaults to enabled) ──
   try {
     const currentHost = window.location.hostname.toLowerCase().replace(/^www\./, '');
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
@@ -476,7 +476,7 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     if (!text) return;
 
     // Direct local storage write for 100% reliability
-    StorageService.addClipbotItem(text, window.location.href, document.title).catch(() => {});
+    StorageService.addClipbotItem(text, window.location.href, document.title).catch(() => { });
 
     // Also send runtime message to notify active extension views
     try {
@@ -487,7 +487,7 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
           sourceUrl: window.location.href,
           sourceTitle: document.title,
         })
-        .catch(() => {});
+        .catch(() => { });
     } catch {
       // Ignore
     }

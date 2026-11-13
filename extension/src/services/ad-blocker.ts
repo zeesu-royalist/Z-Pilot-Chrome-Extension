@@ -1,5 +1,5 @@
 /**
- * Z-Pilot Ad Blocker Service (Z-Shield)
+ * Z-Pilot Ad Blocker Service (Add Blocker)
  * Manages declarative network blocking, cosmetic element hiding rules,
  * site whitelisting, and block count statistics.
  */
