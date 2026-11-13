@@ -17,7 +17,7 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
   // ── Auto-initialize Add Blocker Ad Blocker (Defaults to enabled) ──
   try {
     const currentHost = window.location.hostname.toLowerCase().replace(/^www\./, '');
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.id && chrome.storage?.local) {
       chrome.storage.local.get('zpilot_adblocker_settings', (res) => {
         const settings = res?.['zpilot_adblocker_settings'];
         const isEnabled = settings ? settings.enabled !== false : true;
@@ -471,7 +471,31 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
   // --------------------------------------------------------------------------
   let captureDebounce: ReturnType<typeof setTimeout> | null = null;
 
+  function isContextValid(): boolean {
+    try {
+      return typeof chrome !== 'undefined' && !!chrome.runtime && !!chrome.runtime.id;
+    } catch {
+      return false;
+    }
+  }
+
+  function detachCopyListeners(): void {
+    try {
+      window.removeEventListener('copy', handleCopyAction, true);
+      document.removeEventListener('copy', handleCopyAction, true);
+      window.removeEventListener('keydown', handleKeydownCopy, true);
+      document.removeEventListener('keydown', handleKeydownCopy, true);
+    } catch {
+      // Ignore
+    }
+  }
+
   function dispatchClipbotText(rawText: string): void {
+    if (!isContextValid()) {
+      detachCopyListeners();
+      return;
+    }
+
     const text = rawText.trim();
     if (!text) return;
 
@@ -480,14 +504,16 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
 
     // Also send runtime message to notify active extension views
     try {
-      chrome.runtime
-        .sendMessage({
-          type: 'CLIPBOT_COPY',
-          text,
-          sourceUrl: window.location.href,
-          sourceTitle: document.title,
-        })
-        .catch(() => { });
+      if (chrome.runtime?.sendMessage) {
+        chrome.runtime
+          .sendMessage({
+            type: 'CLIPBOT_COPY',
+            text,
+            sourceUrl: window.location.href,
+            sourceTitle: document.title,
+          })
+          .catch(() => { });
+      }
     } catch {
       // Ignore
     }
@@ -521,6 +547,11 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
   }
 
   function handleCopyAction(): void {
+    if (!isContextValid()) {
+      detachCopyListeners();
+      return;
+    }
+
     // 1. Immediate synchronous check from DOM selection
     const immediateText = getSelectedTextFromDOM();
     if (immediateText) {
@@ -530,6 +561,10 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     // 2. Fallback check with short delay for clipboard APIs / custom page scripts
     if (captureDebounce) clearTimeout(captureDebounce);
     captureDebounce = setTimeout(() => {
+      if (!isContextValid()) {
+        detachCopyListeners();
+        return;
+      }
       const delayedText = getSelectedTextFromDOM();
       if (delayedText) {
         dispatchClipbotText(delayedText);
@@ -548,16 +583,16 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     }, 80);
   }
 
-  // Capture on standard DOM 'copy' event (capturing phase on window & document)
-  window.addEventListener('copy', handleCopyAction, true);
-  document.addEventListener('copy', handleCopyAction, true);
-
   // Capture on macOS (Cmd+C) and Windows/Linux (Ctrl+C) keydown
   const handleKeydownCopy = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C')) {
       handleCopyAction();
     }
   };
+
+  // Capture on standard DOM 'copy' event (capturing phase on window & document)
+  window.addEventListener('copy', handleCopyAction, true);
+  document.addEventListener('copy', handleCopyAction, true);
   window.addEventListener('keydown', handleKeydownCopy, true);
   document.addEventListener('keydown', handleKeydownCopy, true);
 }

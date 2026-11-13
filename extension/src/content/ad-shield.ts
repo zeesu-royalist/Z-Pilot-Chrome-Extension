@@ -256,7 +256,7 @@ export function checkAndSkipVideoAds(): void {
  */
 function reportBlockedCount(count: number): void {
   try {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.id && chrome.runtime?.sendMessage) {
       chrome.runtime
         .sendMessage({
           type: 'AD_ELEMENTS_BLOCKED',

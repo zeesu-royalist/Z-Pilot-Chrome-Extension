@@ -32,7 +32,38 @@ const DEFAULT_PROFILE: UserProfile = {
 };
 
 function isExtensionEnvironment(): boolean {
-  return typeof chrome !== 'undefined' && !!chrome.storage && !!chrome.storage.local;
+  try {
+    return (
+      typeof chrome !== 'undefined' &&
+      !!chrome.runtime &&
+      !!chrome.runtime.id &&
+      !!chrome.storage &&
+      !!chrome.storage.local
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isContextInvalidatedError(err: unknown): boolean {
+  if (!err) return false;
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('Extension context invalidated') || msg.includes('context invalidated');
+}
+
+function logStorageError(action: string, err: unknown): void {
+  if (isContextInvalidatedError(err)) {
+    // Expected when extension is reloaded/updated while older tabs remain open
+    return;
+  }
+  console.error(`[StorageService] ${action}:`, err);
+}
+
+function logStorageWarn(action: string, err: unknown): void {
+  if (isContextInvalidatedError(err)) {
+    return;
+  }
+  console.warn(`[StorageService] ${action}:`, err);
 }
 
 export const StorageService = {
@@ -48,7 +79,7 @@ export const StorageService = {
         return item ? JSON.parse(item) : [];
       }
     } catch (err) {
-      console.warn('[StorageService] Error loading messages, returning empty list:', err);
+      logStorageWarn('Error loading messages, returning empty list', err);
       return [];
     }
   },
@@ -63,7 +94,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(capped));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to save messages:', err);
+      logStorageError('Failed to save messages', err);
     }
   },
 
@@ -75,7 +106,7 @@ export const StorageService = {
         localStorage.removeItem(STORAGE_KEYS.MESSAGES);
       }
     } catch (err) {
-      console.error('[StorageService] Failed to clear messages:', err);
+      logStorageError('Failed to clear messages', err);
     }
   },
 
@@ -89,7 +120,7 @@ export const StorageService = {
         return item ? JSON.parse(item) : DEFAULT_PROFILE;
       }
     } catch (err) {
-      console.warn('[StorageService] Error loading profile:', err);
+      logStorageWarn('Error loading profile', err);
       return DEFAULT_PROFILE;
     }
   },
@@ -102,7 +133,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to save profile:', err);
+      logStorageError('Failed to save profile', err);
     }
   },
 
@@ -116,7 +147,7 @@ export const StorageService = {
         return item ? { ...DEFAULT_SETTINGS, ...JSON.parse(item) } : DEFAULT_SETTINGS;
       }
     } catch (err) {
-      console.warn('[StorageService] Error loading settings:', err);
+      logStorageWarn('Error loading settings', err);
       return DEFAULT_SETTINGS;
     }
   },
@@ -129,7 +160,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to save settings:', err);
+      logStorageError('Failed to save settings', err);
     }
   },
 
@@ -143,7 +174,7 @@ export const StorageService = {
         return item ? JSON.parse(item) : [];
       }
     } catch (err) {
-      console.warn('[StorageService] Error loading notes:', err);
+      logStorageWarn('Error loading notes', err);
       return [];
     }
   },
@@ -156,7 +187,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to save notes:', err);
+      logStorageError('Failed to save notes', err);
     }
   },
 
@@ -222,7 +253,7 @@ export const StorageService = {
         return item ? JSON.parse(item) : [];
       }
     } catch (err) {
-      console.warn('[StorageService] Error loading translations:', err);
+      logStorageWarn('Error loading translations', err);
       return [];
     }
   },
@@ -242,7 +273,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.TRANSLATIONS, JSON.stringify(updated));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to save translation:', err);
+      logStorageError('Failed to save translation', err);
     }
     return newEntry;
   },
@@ -257,7 +288,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.TRANSLATIONS, JSON.stringify(updated));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to delete translation:', err);
+      logStorageError('Failed to delete translation', err);
     }
     return updated;
   },
@@ -272,7 +303,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.TRANSLATIONS, JSON.stringify(updated));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to toggle favorite:', err);
+      logStorageError('Failed to toggle favorite', err);
     }
     return updated;
   },
@@ -285,7 +316,7 @@ export const StorageService = {
         localStorage.removeItem(STORAGE_KEYS.TRANSLATIONS);
       }
     } catch (err) {
-      console.error('[StorageService] Failed to clear translations:', err);
+      logStorageError('Failed to clear translations', err);
     }
   },
 
@@ -299,7 +330,7 @@ export const StorageService = {
         return item ? JSON.parse(item) : [];
       }
     } catch (err) {
-      console.warn('[StorageService] Error loading todos:', err);
+      logStorageWarn('Error loading todos', err);
       return [];
     }
   },
@@ -312,7 +343,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.TODOS, JSON.stringify(todos));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to save todos:', err);
+      logStorageError('Failed to save todos', err);
     }
   },
 
@@ -422,7 +453,7 @@ export const StorageService = {
         return item ? JSON.parse(item) : [];
       }
     } catch (err) {
-      console.warn('[StorageService] Error loading calculation history:', err);
+      logStorageWarn('Error loading calculation history', err);
       return [];
     }
   },
@@ -444,7 +475,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.CALC_HISTORY, JSON.stringify(updated));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to save calculation:', err);
+      logStorageError('Failed to save calculation', err);
     }
     return newRecord;
   },
@@ -457,7 +488,7 @@ export const StorageService = {
         localStorage.removeItem(STORAGE_KEYS.CALC_HISTORY);
       }
     } catch (err) {
-      console.error('[StorageService] Failed to clear calculation history:', err);
+      logStorageError('Failed to clear calculation history', err);
     }
   },
 
@@ -476,7 +507,7 @@ export const StorageService = {
         return raw ? (JSON.parse(raw) as ClipItem[]).slice(0, 10) : [];
       }
     } catch (err) {
-      console.error('[StorageService] Failed to get ClipBot items:', err);
+      logStorageWarn('Failed to get ClipBot items', err);
       return [];
     }
   },
@@ -490,7 +521,7 @@ export const StorageService = {
         localStorage.setItem(STORAGE_KEYS.CLIPBOT, JSON.stringify(capped));
       }
     } catch (err) {
-      console.error('[StorageService] Failed to save ClipBot items:', err);
+      logStorageError('Failed to save ClipBot items', err);
     }
   },
 
