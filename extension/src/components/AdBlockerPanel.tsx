@@ -191,22 +191,17 @@ export const AdBlockerPanel: React.FC<AdBlockerPanelProps> = ({
         {/* Master Shield Hero Banner */}
         <div
           className={`p-4 rounded-3xl border transition-all shadow-2xl ${settings.enabled
-              ? 'bg-gradient-to-b from-orange-600/25 via-amber-600/15 to-black/70 border-orange-500/40 shadow-orange-950/30'
+              ? 'bg-gradient-to-b from-orange-600/20 via-amber-600/10 to-black/70 border-orange-500/40 shadow-orange-950/30'
               : 'bg-black/50 border-white/10 shadow-black/40'
             }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3.5">
-              <div
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${settings.enabled
-                    ? 'bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-600/40'
-                    : 'bg-white/10 text-white/40'
-                  }`}
-              >
+              <div className="w-10 h-10 flex items-center justify-center shrink-0">
                 {settings.enabled ? (
-                  <ShieldCheck className="w-7 h-7 stroke-[2.2]" />
+                  <ShieldCheck className="w-8 h-8 text-orange-400 stroke-[2.2] drop-shadow-sm" />
                 ) : (
-                  <ShieldAlert className="w-7 h-7 stroke-[2]" />
+                  <ShieldAlert className="w-8 h-8 text-white/40 stroke-[2]" />
                 )}
               </div>
               <div>
@@ -221,17 +216,20 @@ export const AdBlockerPanel: React.FC<AdBlockerPanelProps> = ({
               </div>
             </div>
 
-            {/* iOS-style glowing switch */}
+            {/* iOS-style Toggle Switch */}
             <button
+              type="button"
+              role="switch"
+              aria-checked={settings.enabled}
               onClick={handleToggleMaster}
               title={settings.enabled ? 'Pause Ad Blocker' : 'Enable Ad Blocker'}
-              className={`w-12 h-7 rounded-full p-1 transition-colors cursor-pointer border ${settings.enabled
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-600 border-orange-400/50 shadow-md shadow-orange-600/30'
-                  : 'bg-white/15 border-white/20'
+              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-0 p-1 transition-colors duration-200 ease-in-out focus:outline-none ${settings.enabled
+                  ? 'bg-orange-500 shadow-md shadow-orange-500/40'
+                  : 'bg-white/20'
                 }`}
             >
-              <div
-                className={`w-5 h-5 rounded-full bg-white transition-transform shadow ${settings.enabled ? 'translate-x-5' : 'translate-x-0'
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition duration-200 ease-in-out ${settings.enabled ? 'translate-x-5' : 'translate-x-0'
                   }`}
               />
             </button>
@@ -295,15 +293,17 @@ export const AdBlockerPanel: React.FC<AdBlockerPanelProps> = ({
 
               {/* Toggle whitelist */}
               <button
+                type="button"
+                role="switch"
                 onClick={handleToggleSiteWhitelist}
                 disabled={!settings.enabled}
-                className={`w-10 h-6 rounded-full p-0.5 transition-colors cursor-pointer border disabled:opacity-40 ${!isSiteWhitelisted && settings.enabled
-                    ? 'bg-orange-500 border-orange-400'
-                    : 'bg-white/15 border-white/20'
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-0 p-1 transition-colors duration-200 ease-in-out disabled:opacity-40 focus:outline-none ${!isSiteWhitelisted && settings.enabled
+                    ? 'bg-orange-500 shadow-md shadow-orange-500/30'
+                    : 'bg-white/20'
                   }`}
               >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white transition-transform ${!isSiteWhitelisted && settings.enabled ? 'translate-x-4' : 'translate-x-0'
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${!isSiteWhitelisted && settings.enabled ? 'translate-x-5' : 'translate-x-0'
                     }`}
                 />
               </button>
@@ -347,14 +347,16 @@ export const AdBlockerPanel: React.FC<AdBlockerPanelProps> = ({
               </div>
             </div>
             <button
+              type="button"
+              role="switch"
               onClick={handleToggleCosmetic}
-              className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border ${settings.blockCosmetic
-                  ? 'bg-orange-500 border-orange-400'
-                  : 'bg-white/15 border-white/20'
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-0 p-1 transition-colors duration-200 ease-in-out focus:outline-none ${settings.blockCosmetic
+                  ? 'bg-orange-500 shadow-md shadow-orange-500/30'
+                  : 'bg-white/20'
                 }`}
             >
-              <div
-                className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${settings.blockCosmetic ? 'translate-x-4' : 'translate-x-0'
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${settings.blockCosmetic ? 'translate-x-5' : 'translate-x-0'
                   }`}
               />
             </button>
@@ -374,14 +376,16 @@ export const AdBlockerPanel: React.FC<AdBlockerPanelProps> = ({
               </div>
             </div>
             <button
+              type="button"
+              role="switch"
               onClick={handleToggleVideoAds}
-              className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border ${settings.skipVideoAds
-                  ? 'bg-orange-500 border-orange-400'
-                  : 'bg-white/15 border-white/20'
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-0 p-1 transition-colors duration-200 ease-in-out focus:outline-none ${settings.skipVideoAds
+                  ? 'bg-orange-500 shadow-md shadow-orange-500/30'
+                  : 'bg-white/20'
                 }`}
             >
-              <div
-                className={`w-3.5 h-3.5 rounded-full bg-white transition-transform ${settings.skipVideoAds ? 'translate-x-4' : 'translate-x-0'
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${settings.skipVideoAds ? 'translate-x-5' : 'translate-x-0'
                   }`}
               />
             </button>
@@ -390,7 +394,7 @@ export const AdBlockerPanel: React.FC<AdBlockerPanelProps> = ({
 
         {/* Footer info */}
         <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] text-white/50 leading-relaxed text-center">
-          ⚡ Brave Shields grade protection built directly into Chrome. Zero external configuration required.
+          Brave Shields grade protection built directly into Chrome. Zero external configuration required.
         </div>
       </div>
     </div>
