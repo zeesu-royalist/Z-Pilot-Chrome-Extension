@@ -5,6 +5,7 @@ import {
   formatBytes,
   formatDuration,
   selectDownloadableYouTubeFormats,
+  dedupeToBestPerVideo,
 } from '../services/video-deduper.js';
 
 describe('video-deduper', () => {
@@ -239,6 +240,76 @@ describe('video-deduper', () => {
     });
 
     expect(videos.map((v) => v.quality)).toEqual(['2160p', '1080p', '720p']);
+  });
+
+  it('dedupes multiple stream variants of the same video into 1 best video card', () => {
+    const rawVideos = mergeAndRankVideos({
+      pageTitle: 'Apna College Lecture',
+      domCandidates: [
+        {
+          url: 'https://cdn.example.com/lecture_720p.mp4',
+          title: 'Apna College Lecture',
+          format: 'mp4',
+          width: 1280,
+          height: 720,
+          durationSeconds: 418,
+          source: 'dom',
+        },
+      ],
+      networkEntries: [
+        {
+          url: 'https://cdn.example.com/lecture_720p.mp4',
+          canonicalUrl: 'https://cdn.example.com/lecture_720p.mp4',
+          tabId: 1,
+          format: 'mp4',
+          streamKind: 'muxed',
+          quality: '720p',
+          width: 1280,
+          height: 720,
+          sizeBytes: 26 * 1024 * 1024,
+          durationSeconds: 418,
+          detectedAt: 1,
+        },
+        {
+          url: 'https://cdn.example.com/lecture_1080p.mp4',
+          canonicalUrl: 'https://cdn.example.com/lecture_1080p.mp4',
+          tabId: 1,
+          format: 'mp4',
+          streamKind: 'muxed',
+          quality: '1080p',
+          width: 1920,
+          height: 1080,
+          sizeBytes: 50 * 1024 * 1024,
+          durationSeconds: 418,
+          detectedAt: 2,
+        },
+        {
+          url: 'https://cdn.example.com/lecture_480p.mp4',
+          canonicalUrl: 'https://cdn.example.com/lecture_480p.mp4',
+          tabId: 1,
+          format: 'mp4',
+          streamKind: 'muxed',
+          quality: '480p',
+          width: 854,
+          height: 480,
+          sizeBytes: 14 * 1024 * 1024,
+          durationSeconds: 418,
+          detectedAt: 3,
+        },
+      ],
+    });
+
+    // Scanner detected 3 candidate streams
+    expect(rawVideos.length).toBeGreaterThan(1);
+
+    // In the UI, dedupeToBestPerVideo collapses them into exactly 1 clean card!
+    const displayVideos = dedupeToBestPerVideo(rawVideos);
+    expect(displayVideos).toHaveLength(1);
+    expect(displayVideos[0].title).toBe('Apna College Lecture');
+    expect(displayVideos[0].quality).toBe('1080p');
+    expect(displayVideos[0].sizeBytes).toBe(50 * 1024 * 1024);
+    expect(displayVideos[0].filename).toBe('Apna College Lecture [1080p].mp4');
+    expect(displayVideos[0].durationSeconds).toBe(418);
   });
 });
 

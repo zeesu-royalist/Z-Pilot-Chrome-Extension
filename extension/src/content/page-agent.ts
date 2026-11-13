@@ -4,13 +4,36 @@
  * media playback, and deep DOM video scanning on the active webpage.
  */
 
-import { scanDocumentVideos } from './dom-video-scanner.js';
+import { scanDocumentVideos, extractBestPageVideoTitle } from './dom-video-scanner.js';
+import { StorageService } from '../services/storage.js';
+import { initAdShield, getPageBlockedCount } from './ad-shield.js';
 
 // Prevent duplicate execution if re-injected
 if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_PAGE_AGENT_LOADED) {
   (window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED: boolean }).__Z_PILOT_PAGE_AGENT_LOADED = true;
 
   console.log('[Z-Pilot] Page Agent active on:', window.location.href);
+
+  // ── Auto-initialize Z-Shield Ad Blocker (Defaults to enabled) ──
+  try {
+    const currentHost = window.location.hostname.toLowerCase().replace(/^www\./, '');
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.get('zpilot_adblocker_settings', (res) => {
+        const settings = res?.['zpilot_adblocker_settings'];
+        const isEnabled = settings ? settings.enabled !== false : true;
+        const isWhitelisted =
+          Array.isArray(settings?.whitelistedDomains) &&
+          settings.whitelistedDomains.includes(currentHost);
+        if (isEnabled && !isWhitelisted) {
+          initAdShield(true);
+        }
+      });
+    } else {
+      initAdShield(true);
+    }
+  } catch {
+    initAdShield(true);
+  }
 
   /**
    * Extract clean, readable text from the active webpage
@@ -392,9 +415,10 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
 
       case 'SCAN_VIDEOS': {
         const videos = scanDocumentVideos(document, window.location.href);
+        const bestTitle = extractBestPageVideoTitle(document, window.location.href);
         sendResponse({
           url: window.location.href,
-          title: document.title,
+          title: bestTitle || document.title,
           videos,
         });
         return false;
@@ -422,9 +446,118 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
         return false;
       }
 
+      case 'GET_AD_BLOCK_STATS': {
+        sendResponse({
+          pageCount: getPageBlockedCount(),
+          url: window.location.href,
+        });
+        return false;
+      }
+
+      case 'TOGGLE_AD_SHIELD': {
+        initAdShield(!!request.enabled);
+        sendResponse({ success: true, enabled: !!request.enabled });
+        return false;
+      }
+
       default:
         sendResponse({ error: 'Unknown action type in page agent' });
         return false;
     }
   });
+
+  // --------------------------------------------------------------------------
+  // ClipBot: Automatic Browser Clipboard Capture (Max 10 clips)
+  // --------------------------------------------------------------------------
+  let captureDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  function dispatchClipbotText(rawText: string): void {
+    const text = rawText.trim();
+    if (!text) return;
+
+    // Direct local storage write for 100% reliability
+    StorageService.addClipbotItem(text, window.location.href, document.title).catch(() => {});
+
+    // Also send runtime message to notify active extension views
+    try {
+      chrome.runtime
+        .sendMessage({
+          type: 'CLIPBOT_COPY',
+          text,
+          sourceUrl: window.location.href,
+          sourceTitle: document.title,
+        })
+        .catch(() => {});
+    } catch {
+      // Ignore
+    }
+  }
+
+  function getSelectedTextFromDOM(): string {
+    try {
+      // 1. Regular window selection
+      const sel = window.getSelection();
+      const str = sel?.toString()?.trim();
+      if (str) return str;
+
+      // 2. Active input / textarea element selection
+      if (document.activeElement) {
+        const el = document.activeElement;
+        if (
+          el instanceof HTMLInputElement ||
+          el instanceof HTMLTextAreaElement
+        ) {
+          const start = el.selectionStart || 0;
+          const end = el.selectionEnd || 0;
+          if (end > start) {
+            return el.value.substring(start, end).trim();
+          }
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return '';
+  }
+
+  function handleCopyAction(): void {
+    // 1. Immediate synchronous check from DOM selection
+    const immediateText = getSelectedTextFromDOM();
+    if (immediateText) {
+      dispatchClipbotText(immediateText);
+    }
+
+    // 2. Fallback check with short delay for clipboard APIs / custom page scripts
+    if (captureDebounce) clearTimeout(captureDebounce);
+    captureDebounce = setTimeout(() => {
+      const delayedText = getSelectedTextFromDOM();
+      if (delayedText) {
+        dispatchClipbotText(delayedText);
+      } else if (navigator.clipboard?.readText) {
+        navigator.clipboard
+          .readText()
+          .then((clip) => {
+            if (clip && clip.trim()) {
+              dispatchClipbotText(clip.trim());
+            }
+          })
+          .catch(() => {
+            // Ignore permission error
+          });
+      }
+    }, 80);
+  }
+
+  // Capture on standard DOM 'copy' event (capturing phase on window & document)
+  window.addEventListener('copy', handleCopyAction, true);
+  document.addEventListener('copy', handleCopyAction, true);
+
+  // Capture on macOS (Cmd+C) and Windows/Linux (Ctrl+C) keydown
+  const handleKeydownCopy = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C')) {
+      handleCopyAction();
+    }
+  };
+  window.addEventListener('keydown', handleKeydownCopy, true);
+  document.addEventListener('keydown', handleKeydownCopy, true);
 }

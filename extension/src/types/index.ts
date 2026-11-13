@@ -224,3 +224,73 @@ export interface VideoDownloadProgress {
   chromeDownloadId?: number;
   mode?: 'video' | 'audio';
 }
+
+export interface QuickNote {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+  pinned?: boolean;
+  pageUrl?: string;
+  pageTitle?: string;
+}
+
+export interface SavedTranslation {
+  id: string;
+  sourceText: string;
+  translatedText: string;
+  sourceLang: string;
+  targetLang: string;
+  timestamp: number;
+  favorite?: boolean;
+}
+
+export type TodoPriority = 'low' | 'medium' | 'high';
+
+export interface TodoItem {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  createdAt: number;
+  dueDate?: number; // reminder timestamp in epoch ms
+  reminderSet?: boolean;
+  notified?: boolean;
+  priority?: TodoPriority;
+  pageUrl?: string;
+  pageTitle?: string;
+}
+
+export interface CalculationRecord {
+  id: string;
+  expression: string;
+  result: string;
+  timestamp: number;
+}
+
+export interface ClipItem {
+  id: string;
+  text: string;
+  timestamp: number;
+  sourceUrl?: string;
+  sourceTitle?: string;
+  pinned?: boolean;
+}
+
+export interface AdBlockerSettings {
+  enabled: boolean;
+  blockCosmetic: boolean;
+  skipVideoAds: boolean;
+  whitelistedDomains: string[];
+  totalBlockedCount: number;
+}
+
+export interface PageAdBlockStats {
+  pageCount: number;
+  totalCount: number;
+  isWhitelisted: boolean;
+  domain: string;
+}
+
+

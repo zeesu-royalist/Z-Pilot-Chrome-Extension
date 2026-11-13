@@ -1,4 +1,5 @@
 import type { RawDomVideoCandidate } from '../services/video-deduper.js';
+import { isGenericTitle } from '../services/video-deduper.js';
 import type { VideoFormatKind } from '../types/index.js';
 
 const MEDIA_EXT_REGEX =
@@ -46,6 +47,183 @@ function resolveAbsoluteUrl(raw: string | null | undefined, baseHref: string): s
   } catch {
     return '';
   }
+}
+
+
+export function cleanTitleText(raw?: string): string {
+  if (!raw) return '';
+  let text = raw.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+  text = text
+    .replace(/\b(video|audio|play|completed|locked|unlocked|preview)\b/gi, '')
+    .replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, '')
+    .replace(/[▶►|•·]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text;
+}
+
+export function extractTitleFromUrl(rawUrl?: string): string | undefined {
+  if (!rawUrl) return undefined;
+  try {
+    const parsed = new URL(rawUrl);
+    const pathname = decodeURIComponent(parsed.pathname);
+    const lastSlash = pathname.lastIndexOf('/');
+    const filename = lastSlash >= 0 ? pathname.slice(lastSlash + 1) : pathname;
+    const dot = filename.lastIndexOf('.');
+    const base = (dot > 0 ? filename.slice(0, dot) : filename).trim();
+    if (!base || base.length < 3 || isGenericTitle(base)) return undefined;
+    const clean = base
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (isGenericTitle(clean)) return undefined;
+    return clean.replace(/\b\w/g, (c) => c.toUpperCase());
+  } catch {
+    return undefined;
+  }
+}
+
+export function extractBestPageVideoTitle(
+  doc: Document = document,
+  baseHref: string = typeof window !== 'undefined' ? window.location.href : ''
+): string {
+  // 1. Look for active syllabus / lesson / playlist item in LMS / course players (Apna College, Coursera, etc.)
+  const activeSelectors = [
+    '[class*="active"][class*="lesson"]',
+    '[class*="active"][class*="video"]',
+    '[class*="active"][class*="lecture"]',
+    '[class*="active"][class*="item"]',
+    '[class*="active"][class*="topic"]',
+    '[class*="selected"][class*="lesson"]',
+    '[class*="selected"][class*="video"]',
+    '[class*="current"][class*="lesson"]',
+    '[class*="current"][class*="video"]',
+    '[aria-current="page"]',
+    '[aria-current="true"]',
+    '[aria-selected="true"]',
+    '.active [class*="title"]',
+    '[class*="active"] [class*="title"]',
+    '[class*="is-active"]',
+    '[class*="playing"]',
+  ];
+
+  for (const sel of activeSelectors) {
+    try {
+      const el = doc.querySelector(sel);
+      if (el) {
+        const text = cleanTitleText(el.textContent || '');
+        if (text && text.length >= 3 && !isGenericTitle(text, baseHref)) {
+          return text;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 2. Look for primary heading / video title in the DOM
+  const headingSelectors = [
+    'h1[class*="title"]',
+    'h1[class*="lesson"]',
+    'h1[class*="video"]',
+    'h1[class*="lecture"]',
+    '[class*="video-title"]',
+    '[class*="videoTitle"]',
+    '[class*="lesson-title"]',
+    '[class*="lessonTitle"]',
+    '[class*="lecture-title"]',
+    '[class*="lectureTitle"]',
+    '[data-testid*="video-title"]',
+    '[data-testid*="lesson-title"]',
+    'main h1',
+    'article h1',
+    '[role="main"] h1',
+    '.content h1',
+    'h1',
+    'h2[class*="title"]',
+    'h2[class*="lesson"]',
+    'h2[class*="video"]',
+  ];
+
+  for (const sel of headingSelectors) {
+    try {
+      const el = doc.querySelector(sel);
+      if (el) {
+        const text = cleanTitleText(el.textContent || '');
+        if (text && text.length >= 3 && !isGenericTitle(text, baseHref)) {
+          return text;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 3. Inspect <video> element attributes & container headings
+  const videos = doc.querySelectorAll('video');
+  for (let i = 0; i < videos.length; i++) {
+    const v = videos[i];
+    const attrTitle =
+      v.getAttribute('title') ||
+      v.getAttribute('aria-label') ||
+      v.getAttribute('data-title') ||
+      v.getAttribute('data-lesson-title');
+    if (attrTitle) {
+      const text = cleanTitleText(attrTitle);
+      if (text && !isGenericTitle(text, baseHref)) return text;
+    }
+
+    const figCaption = v.closest('figure')?.querySelector('figcaption')?.textContent;
+    if (figCaption) {
+      const text = cleanTitleText(figCaption);
+      if (text && !isGenericTitle(text, baseHref)) return text;
+    }
+
+    const container = v.closest('[class*="player"], [class*="video"], [class*="media"]')?.parentElement;
+    if (container) {
+      const heading = container.querySelector('h1, h2, h3, [class*="title"]')?.textContent;
+      if (heading) {
+        const text = cleanTitleText(heading);
+        if (text && !isGenericTitle(text, baseHref)) return text;
+      }
+    }
+  }
+
+  // 4. Meta tags (og:title, twitter:title)
+  const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
+  if (ogTitle) {
+    const text = cleanTitleText(ogTitle);
+    if (text && !isGenericTitle(text, baseHref)) return text;
+  }
+  const twTitle = doc.querySelector('meta[name="twitter:title"]')?.getAttribute('content');
+  if (twTitle) {
+    const text = cleanTitleText(twTitle);
+    if (text && !isGenericTitle(text, baseHref)) return text;
+  }
+
+  // 5. Clean document title (strip brand suffix if delimited by | or - or •)
+  const rawDocTitle = doc.title?.trim() || '';
+  if (rawDocTitle) {
+    const parts = rawDocTitle.split(/\s*[-|—•»·:]\s*/).filter(Boolean);
+    if (parts.length > 1) {
+      for (const part of parts) {
+        const cleanedPart = cleanTitleText(part);
+        if (cleanedPart && !isGenericTitle(cleanedPart, baseHref)) {
+          return cleanedPart;
+        }
+      }
+    }
+    const cleanDoc = cleanTitleText(rawDocTitle);
+    if (cleanDoc && !isGenericTitle(cleanDoc, baseHref)) {
+      return cleanDoc;
+    }
+  }
+
+  // 6. Fallback to URL path title
+  const urlTitle = extractTitleFromUrl(baseHref);
+  if (urlTitle) return urlTitle;
+
+  return rawDocTitle || 'Web Video';
 }
 
 /**
@@ -107,7 +285,9 @@ export function scanDocumentVideos(
 ): RawDomVideoCandidate[] {
   const results: RawDomVideoCandidate[] = [];
   const seenUrls = new Set<string>();
-  const pageTitle = doc.title?.trim() || 'Web Video';
+  const pageVideoTitle = extractBestPageVideoTitle(doc, baseHref);
+  const fallbackTitle = pageVideoTitle || doc.title?.trim() || 'Web Video';
+  const pageTitle = fallbackTitle;
 
   const pushCandidate = (candidate: RawDomVideoCandidate) => {
     if (!candidate.url) return;
@@ -125,10 +305,13 @@ export function scanDocumentVideos(
     const height = video.videoHeight || Number(video.getAttribute('height')) || undefined;
     const durationSeconds =
       Number.isFinite(video.duration) && video.duration > 0 ? video.duration : undefined;
-    const title =
+    const attrTitle =
       video.getAttribute('title') ||
       video.getAttribute('aria-label') ||
-      pageTitle;
+      video.getAttribute('data-title') ||
+      video.getAttribute('data-lesson-title');
+    const cleanedAttr = cleanTitleText(attrTitle || '');
+    const title = cleanedAttr && !isGenericTitle(cleanedAttr, baseHref) ? cleanedAttr : fallbackTitle;
 
     const srcCandidates: Array<{ url: string; type?: string }> = [];
 

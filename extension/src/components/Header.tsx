@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, X, User, Home, Film } from 'lucide-react';
+import { Settings, X, User, Home, Film, NotebookPen, Languages, CheckSquare, Calculator, ClipboardList, MessageCircle, Shield } from 'lucide-react';
 import { BrandMark } from './BrandLogo.js';
 
 interface HeaderProps {
@@ -9,6 +9,18 @@ interface HeaderProps {
   onNewChat: () => void;
   onOpenVideoScanner: () => void;
   detectedVideoCount?: number;
+  onOpenQuickNotes?: () => void;
+  notesCount?: number;
+  onOpenTranslator?: () => void;
+  translationsCount?: number;
+  onOpenTodoList?: () => void;
+  todosCount?: number;
+  onOpenCalculator?: () => void;
+  onOpenClipBot?: () => void;
+  clipsCount?: number;
+  onOpenChat?: () => void;
+  onOpenAdBlocker?: () => void;
+  blockedAdsCount?: number;
   hasMessages?: boolean;
   websiteUrl?: string;
 }
@@ -18,6 +30,18 @@ export const Header: React.FC<HeaderProps> = ({
   onNewChat,
   onOpenVideoScanner,
   detectedVideoCount = 0,
+  onOpenQuickNotes,
+  notesCount = 0,
+  onOpenTranslator,
+  translationsCount = 0,
+  onOpenTodoList,
+  todosCount = 0,
+  onOpenCalculator,
+  onOpenClipBot,
+  clipsCount = 0,
+  onOpenChat,
+  onOpenAdBlocker,
+  blockedAdsCount = 0,
   hasMessages = false,
   websiteUrl = 'https://zeesu-royalist.vercel.app',
 }) => {
@@ -50,8 +74,103 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="font-medium">Close chat</span>
         </button>
 
-        {/* Right Video Scan + Settings Buttons */}
+        {/* Right Video Scan + Notes + Settings Buttons */}
         <div className="flex items-center space-x-1.5">
+          {onOpenQuickNotes && (
+            <button
+              onClick={onOpenQuickNotes}
+              title="Quick Notes"
+              className="relative w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-amber-600/30 border border-white/15 hover:border-amber-500/50 text-white/85 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+            >
+              <NotebookPen className="w-4 h-4 stroke-[1.75]" />
+              {notesCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-[8px] font-bold text-white flex items-center justify-center shadow">
+                  {notesCount > 9 ? '9+' : notesCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {onOpenTranslator && (
+            <button
+              onClick={onOpenTranslator}
+              title="Translator"
+              className="relative w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-amber-600/30 border border-white/15 hover:border-amber-500/50 text-white/85 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+            >
+              <Languages className="w-4 h-4 stroke-[1.75]" />
+              {translationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-[8px] font-bold text-white flex items-center justify-center shadow">
+                  {translationsCount > 9 ? '9+' : translationsCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {onOpenTodoList && (
+            <button
+              onClick={onOpenTodoList}
+              title="Tasks & Reminders"
+              className="relative w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-amber-600/30 border border-white/15 hover:border-amber-500/50 text-white/85 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+            >
+              <CheckSquare className="w-4 h-4 stroke-[1.75]" />
+              {todosCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-[8px] font-bold text-white flex items-center justify-center shadow">
+                  {todosCount > 9 ? '9+' : todosCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {onOpenCalculator && (
+            <button
+              onClick={onOpenCalculator}
+              title="Advanced Calculator"
+              className="relative w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-amber-600/30 border border-white/15 hover:border-amber-500/50 text-white/85 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+            >
+              <Calculator className="w-4 h-4 stroke-[1.75]" />
+            </button>
+          )}
+
+          {onOpenClipBot && (
+            <button
+              onClick={onOpenClipBot}
+              title="ClipBot (Auto Clipboard Capture)"
+              className="relative w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-orange-600/30 border border-white/15 hover:border-orange-500/50 text-white/85 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+            >
+              <ClipboardList className="w-4 h-4 stroke-[1.75]" />
+              {clipsCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-gradient-to-r from-orange-600 to-amber-500 text-[9px] font-bold text-white flex items-center justify-center shadow">
+                  {clipsCount > 9 ? '9+' : clipsCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {onOpenChat && (
+            <button
+              onClick={onOpenChat}
+              title="Friend Chat (Real-time)"
+              className="relative w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-orange-600/30 border border-white/15 hover:border-orange-500/50 text-white/85 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+            >
+              <MessageCircle className="w-4 h-4 stroke-[1.75]" />
+            </button>
+          )}
+
+          {onOpenAdBlocker && (
+            <button
+              onClick={onOpenAdBlocker}
+              title="Z-Shield Ad Blocker"
+              className="relative w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-orange-600/30 border border-white/15 hover:border-orange-500/50 text-white/85 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+            >
+              <Shield className="w-4 h-4 stroke-[1.75]" />
+              {blockedAdsCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-gradient-to-r from-orange-600 to-amber-500 text-[8px] font-bold text-white flex items-center justify-center shadow">
+                  {blockedAdsCount > 99 ? '99+' : blockedAdsCount}
+                </span>
+              )}
+            </button>
+          )}
+
           <button
             onClick={onOpenVideoScanner}
             title="Scan & Download Webpage Videos (1-Click)"
@@ -77,52 +196,37 @@ export const Header: React.FC<HeaderProps> = ({
     );
   }
 
-  // Home view top bar (from Screenshot 1)
+  // Home view — premium minimal header
   return (
-    <header className="flex items-center justify-between px-4 py-3 sticky top-0 z-20">
-      {/* Brand logo & "Z-Pilot, Welcome back" (No circle border wrapper) */}
+    <header className="flex items-center justify-between px-4 py-3.5 sticky top-0 z-20">
+      {/* Brand — just logo + text, no box */}
       <div className="flex items-center space-x-2.5">
-        <BrandMark size={32} className="object-contain shrink-0" />
-        <div className="flex flex-col">
-          <span className="font-semibold text-sm tracking-tight text-white leading-tight">
+        <BrandMark size={30} className="object-contain shrink-0" />
+        <div className="flex flex-col leading-tight">
+          <span className="font-bold text-[13px] tracking-tight text-white leading-tight">
             Z-Pilot,
           </span>
-          <span className="text-xs text-white/70 font-normal">
+          <span className="text-[11px] text-white/50 font-normal leading-tight">
             Browser Agent
           </span>
         </div>
       </div>
 
-      {/* Right Circular Frosted Buttons */}
-      <div className="flex items-center space-x-2">
-        {/* 1-Click Video Scanner Button */}
+      {/* Right: User + Settings — dark frosted pill */}
+      <div className="flex items-center space-x-1 bg-white/[0.07] border border-white/[0.08] p-1 rounded-2xl">
         <button
-          onClick={onOpenVideoScanner}
-          title="Scan & Download Webpage Videos (1-Click)"
-          className="relative w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-orange-500/25 border border-white/15 hover:border-orange-400/50 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-sm active:scale-95"
-        >
-          <Film className="w-4 h-4 stroke-[1.75]" />
-          {detectedVideoCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-gradient-to-r from-orange-600 to-amber-500 text-[9px] font-bold text-white flex items-center justify-center shadow">
-              {detectedVideoCount > 9 ? '9+' : detectedVideoCount}
-            </span>
-          )}
-        </button>
-
-        {/* User Website button (next to Settings) */}
-        <button
+          type="button"
           onClick={handleOpenWebsite}
-          title="Visit Creator Website (zeesu-royalist.vercel.app)"
-          className="w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-sm active:scale-95"
+          title="Visit Creator Website"
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer active:scale-90"
         >
           <User className="w-4 h-4 stroke-[1.75]" />
         </button>
-
-        {/* Menu / Settings Button */}
         <button
+          type="button"
           onClick={onOpenSettings}
           title="Settings & API Key"
-          className="w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-sm active:scale-95"
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer active:scale-90"
         >
           <Settings className="w-4 h-4 stroke-[1.75]" />
         </button>

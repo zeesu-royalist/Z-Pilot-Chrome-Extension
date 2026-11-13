@@ -21,6 +21,13 @@ import { ChatInput } from './components/ChatInput.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
 import { ProfileModal } from './components/ProfileModal.js';
 import { VideoScannerPanel } from './components/VideoScannerPanel.js';
+import { QuickNotesPanel } from './components/QuickNotesPanel.js';
+import { TranslatorPanel } from './components/TranslatorPanel.js';
+import { TodoListPanel } from './components/TodoListPanel.js';
+import { CalculatorPanel } from './components/CalculatorPanel.js';
+import { ClipBotPanel } from './components/ClipBotPanel.js';
+import { ChatPanel } from './components/ChatPanel.js';
+import { AdBlockerPanel } from './components/AdBlockerPanel.js';
 
 export const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -37,6 +44,32 @@ export const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Quick Notes State
+  const [isQuickNotesOpen, setIsQuickNotesOpen] = useState(false);
+  const [notesCount, setNotesCount] = useState(0);
+
+  // Translator State
+  const [isTranslatorOpen, setIsTranslatorOpen] = useState(false);
+  const [translationsCount, setTranslationsCount] = useState(0);
+
+  // Tasks & Reminders State
+  const [isTodoListOpen, setIsTodoListOpen] = useState(false);
+  const [todosCount, setTodosCount] = useState(0);
+
+  // Advanced Calculator State
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+  // ClipBot (Auto-Clipboard) State
+  const [isClipBotOpen, setIsClipBotOpen] = useState(false);
+  const [clipsCount, setClipsCount] = useState(0);
+
+  // Friend Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Z-Shield Ad Blocker State
+  const [isAdBlockerOpen, setIsAdBlockerOpen] = useState(false);
+  const [blockedAdsCount, setBlockedAdsCount] = useState(0);
 
   // Video Scanner & Downloader v2 State
   const [isVideoScannerOpen, setIsVideoScannerOpen] = useState(false);
@@ -59,16 +92,42 @@ export const App: React.FC = () => {
   // Initial load
   useEffect(() => {
     async function init() {
-      // Load stored settings and profile
-      const [savedSettings, savedProfile, savedMessages] = await Promise.all([
+      // Load stored settings, profile, and notes
+      const [savedSettings, savedProfile, savedMessages, savedNotes] = await Promise.all([
         StorageService.getSettings(),
         StorageService.getProfile(),
         StorageService.getMessages(),
+        StorageService.getNotes(),
       ]);
 
       setSettings(savedSettings);
       setProfile(savedProfile);
       setMessages(savedMessages);
+      setNotesCount(savedNotes.length);
+
+      // Load translations count
+      StorageService.getTranslations().then((t) => setTranslationsCount(t.length));
+
+      // Load pending todos count
+      StorageService.getTodos().then((t) =>
+        setTodosCount(t.filter((item) => !item.completed).length)
+      );
+
+      // Load ClipBot clips count
+      StorageService.getClipbotItems().then((c) => setClipsCount(c.length));
+
+      // Query active tab ad blocking stats
+      if (typeof chrome !== 'undefined' && chrome.tabs?.query) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'GET_AD_BLOCK_STATS' }, (res) => {
+              if (!chrome.runtime.lastError && res && typeof res.pageCount === 'number') {
+                setBlockedAdsCount(res.pageCount);
+              }
+            });
+          }
+        });
+      }
 
       // Refresh active tab context
       await refreshContext();
@@ -78,12 +137,28 @@ export const App: React.FC = () => {
 
     // Listen to tab activation and navigation updates if extension APIs are available
     if (typeof chrome !== 'undefined' && chrome.tabs) {
+      const queryTabAdStats = () => {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          if (tabs[0]?.id) {
+            chrome.tabs.sendMessage(tabs[0].id, { type: 'GET_AD_BLOCK_STATS' }, (res) => {
+              if (!chrome.runtime.lastError && res && typeof res.pageCount === 'number') {
+                setBlockedAdsCount(res.pageCount);
+              } else {
+                setBlockedAdsCount(0);
+              }
+            });
+          }
+        });
+      };
+
       const handleActivated = () => {
         refreshContext();
+        queryTabAdStats();
       };
       const handleUpdated = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
         if (changeInfo.status === 'complete') {
           refreshContext();
+          queryTabAdStats();
         }
       };
 
@@ -95,8 +170,13 @@ export const App: React.FC = () => {
         tabId?: number;
         count?: number;
         progress?: VideoDownloadProgress;
+        items?: unknown[];
       }) => {
-        if (msg.type === 'SNIFFED_MEDIA_UPDATED' && msg.tabId === activeTabIdRef.current) {
+        if (msg.type === 'AD_ELEMENTS_BLOCKED' && typeof msg.count === 'number') {
+          setBlockedAdsCount((prev) => prev + (msg.count || 0));
+        } else if (msg.type === 'CLIPBOT_UPDATED' && Array.isArray(msg.items)) {
+          setClipsCount(msg.items.length);
+        } else if (msg.type === 'SNIFFED_MEDIA_UPDATED' && msg.tabId === activeTabIdRef.current) {
           setSniffedCount(msg.count || 0);
         } else if (msg.type === 'DOWNLOAD_PROGRESS' && msg.progress) {
           const p = msg.progress;
@@ -124,11 +204,30 @@ export const App: React.FC = () => {
         chrome.runtime.onMessage.addListener(handleRuntimeMessage);
       }
 
+      const handleStorageChange = (
+        changes: { [key: string]: chrome.storage.StorageChange },
+        areaName: string
+      ) => {
+        if (areaName === 'local' && changes['zpilot_clipbot_items']) {
+          const val = changes['zpilot_clipbot_items'].newValue;
+          if (Array.isArray(val)) {
+            setClipsCount(val.length);
+          }
+        }
+      };
+
+      if (chrome.storage?.onChanged) {
+        chrome.storage.onChanged.addListener(handleStorageChange);
+      }
+
       return () => {
         if (chrome.tabs.onActivated) chrome.tabs.onActivated.removeListener(handleActivated);
         if (chrome.tabs.onUpdated) chrome.tabs.onUpdated.removeListener(handleUpdated);
         if (chrome.runtime?.onMessage) {
           chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
+        }
+        if (chrome.storage?.onChanged) {
+          chrome.storage.onChanged.removeListener(handleStorageChange);
         }
       };
     }
@@ -554,6 +653,18 @@ export const App: React.FC = () => {
         onNewChat={handleNewChat}
         onOpenVideoScanner={handleOpenVideoScanner}
         detectedVideoCount={sniffedCount}
+        onOpenQuickNotes={() => setIsQuickNotesOpen(true)}
+        notesCount={notesCount}
+        onOpenTranslator={() => setIsTranslatorOpen(true)}
+        translationsCount={translationsCount}
+        onOpenTodoList={() => setIsTodoListOpen(true)}
+        todosCount={todosCount}
+        onOpenCalculator={() => setIsCalculatorOpen(true)}
+        onOpenClipBot={() => setIsClipBotOpen(true)}
+        clipsCount={clipsCount}
+        onOpenChat={() => setIsChatOpen(true)}
+        onOpenAdBlocker={() => setIsAdBlockerOpen(true)}
+        blockedAdsCount={blockedAdsCount}
         hasMessages={messages.length > 0}
       />
 
@@ -569,6 +680,18 @@ export const App: React.FC = () => {
             onSaveApiKey={handleSaveApiKey}
             onOpenVideoScanner={handleOpenVideoScanner}
             detectedVideoCount={sniffedCount}
+            onOpenQuickNotes={() => setIsQuickNotesOpen(true)}
+            notesCount={notesCount}
+            onOpenTranslator={() => setIsTranslatorOpen(true)}
+            translationsCount={translationsCount}
+            onOpenTodoList={() => setIsTodoListOpen(true)}
+            todosCount={todosCount}
+            onOpenCalculator={() => setIsCalculatorOpen(true)}
+            onOpenClipBot={() => setIsClipBotOpen(true)}
+            clipsCount={clipsCount}
+            onOpenChat={() => setIsChatOpen(true)}
+            onOpenAdBlocker={() => setIsAdBlockerOpen(true)}
+            blockedAdsCount={blockedAdsCount}
           />
         </div>
       ) : (
@@ -626,6 +749,59 @@ export const App: React.FC = () => {
         onDownload={handleDownloadVideo}
         onDownloadAudio={handleDownloadAudio}
         onCancelDownload={handleCancelVideoDownload}
+      />
+
+      {/* Quick Notes Modal */}
+      <QuickNotesPanel
+        isOpen={isQuickNotesOpen}
+        onClose={() => setIsQuickNotesOpen(false)}
+        currentPageUrl={pageContext?.url}
+        currentPageTitle={pageContext?.title}
+        onNotesCountChange={(count) => setNotesCount(count)}
+      />
+
+      {/* Translator Panel */}
+      <TranslatorPanel
+        isOpen={isTranslatorOpen}
+        onClose={() => setIsTranslatorOpen(false)}
+        onHistoryCountChange={(count) => setTranslationsCount(count)}
+      />
+
+      {/* Tasks & Reminders Panel */}
+      <TodoListPanel
+        isOpen={isTodoListOpen}
+        onClose={() => setIsTodoListOpen(false)}
+        currentPageUrl={pageContext?.url}
+        currentPageTitle={pageContext?.title}
+        onTodosCountChange={(count) => setTodosCount(count)}
+      />
+
+      {/* Advanced Calculator Panel */}
+      <CalculatorPanel
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+      />
+
+      {/* ClipBot (Auto-Clipboard) Panel */}
+      <ClipBotPanel
+        isOpen={isClipBotOpen}
+        onClose={() => {
+          setIsClipBotOpen(false);
+          StorageService.getClipbotItems().then((c) => setClipsCount(c.length));
+        }}
+      />
+
+      {/* Friend Chat Panel */}
+      <ChatPanel
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+      />
+
+      {/* Z-Shield Ad Blocker Panel */}
+      <AdBlockerPanel
+        isOpen={isAdBlockerOpen}
+        onClose={() => setIsAdBlockerOpen(false)}
+        currentPageUrl={pageContext?.url}
       />
 
       {/* User Autofill Profile Modal */}

@@ -20,7 +20,7 @@ import {
   VideoDownloadProgress,
   VideoScanResult,
 } from '../types/index.js';
-import { formatBytes, formatDuration } from '../services/video-deduper.js';
+import { formatBytes, formatDuration, dedupeToBestPerVideo } from '../services/video-deduper.js';
 import { Y2MATE_YOUTUBE_URL } from '../services/y2mate-autofill.js';
 
 interface VideoScannerPanelProps {
@@ -141,7 +141,11 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
     }
   };
 
-  const videos = scanResult?.videos || [];
+  const rawVideos = scanResult?.videos || [];
+
+  const videos = useMemo(() => {
+    return dedupeToBestPerVideo(rawVideos);
+  }, [rawVideos]);
 
   const counts = useMemo(() => {
     let videoCount = 0;

@@ -167,6 +167,84 @@ function inferFormatFromUrl(url: string, mimeType?: string): VideoFormatKind {
   return 'mp4';
 }
 
+const GENERIC_TITLES = new Set([
+  'video',
+  'web video',
+  'media',
+  'player',
+  'video player',
+  'untitled',
+  'home',
+  'dashboard',
+  'watch',
+  'course',
+  'courses',
+  'index',
+  'login',
+  'sign in',
+  'zpilot-video',
+]);
+
+export function isGenericTitle(raw?: string, domainOrUrl?: string): boolean {
+  if (!raw) return true;
+  const clean = raw.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!clean || clean.length < 2) return true;
+  if (GENERIC_TITLES.has(clean)) return true;
+
+  if (domainOrUrl) {
+    try {
+      const hostname = domainOrUrl.startsWith('http')
+        ? new URL(domainOrUrl).hostname
+        : domainOrUrl;
+      const cleanHost = hostname.toLowerCase().replace(/^www\./, '').split('.')[0];
+      if (cleanHost && (clean === cleanHost || clean.replace(/\s+/g, '') === cleanHost)) {
+        return true;
+      }
+    } catch {
+      // ignore URL parsing error
+    }
+  }
+
+  return false;
+}
+
+export function extractTitleFromUrl(rawUrl?: string): string | undefined {
+  if (!rawUrl) return undefined;
+  try {
+    const parsed = new URL(rawUrl);
+    const pathname = decodeURIComponent(parsed.pathname);
+    const lastSlash = pathname.lastIndexOf('/');
+    const filename = lastSlash >= 0 ? pathname.slice(lastSlash + 1) : pathname;
+    const dot = filename.lastIndexOf('.');
+    const base = (dot > 0 ? filename.slice(0, dot) : filename).trim();
+    if (!base || base.length < 3 || isGenericTitle(base)) return undefined;
+    const clean = base
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (isGenericTitle(clean)) return undefined;
+    return clean.replace(/\b\w/g, (c) => c.toUpperCase());
+  } catch {
+    return undefined;
+  }
+}
+
+export function parseQualityHeight(quality?: string, height?: number): number {
+  if (height && height > 0) return height;
+  if (!quality) return 0;
+  const q = quality.toLowerCase().trim();
+  if (q.includes('original') || q.includes('source') || q.includes('master')) return 99999;
+  if (q.includes('4k') || q.includes('2160')) return 2160;
+  if (q.includes('2k') || q.includes('1440')) return 1440;
+  if (q.includes('1080')) return 1080;
+  if (q.includes('720')) return 720;
+  if (q.includes('480')) return 480;
+  if (q.includes('360')) return 360;
+  if (q.includes('240')) return 240;
+  const num = parseInt(q, 10);
+  return Number.isFinite(num) ? num : 0;
+}
+
 function inferQualityLabel(width?: number, height?: number): string | undefined {
   if (height && height > 0) return `${height}p`;
   if (width && width >= 1920) return '1080p';
@@ -234,13 +312,24 @@ export function mergeAndRankVideos(params: {
     }
 
     // Prefer richer metadata across sources
+    const isCandidateTitleBetter =
+      Boolean(candidate.title) &&
+      !isGenericTitle(candidate.title, params.pageTitle) &&
+      (isGenericTitle(existing.title, params.pageTitle) || existing.title === params.pageTitle);
+
+    const mergedTitle = isCandidateTitleBetter
+      ? (candidate.title as string)
+      : existing.title || candidate.title || params.pageTitle;
+    const mergedQuality = existing.quality || candidate.quality;
+    const mergedExt = getExtensionForFormat(
+      candidate.format || existing.format,
+      candidate.mimeType || existing.mimeType
+    );
+
     byCanonical.set(candidate.canonicalUrl, {
       ...existing,
-      title:
-        existing.title && existing.title !== pageTitle
-          ? existing.title
-          : candidate.title || pageTitle,
-      quality: existing.quality || candidate.quality,
+      title: mergedTitle,
+      quality: mergedQuality,
       width: existing.width || candidate.width,
       height: existing.height || candidate.height,
       durationSeconds: existing.durationSeconds || candidate.durationSeconds,
@@ -251,7 +340,7 @@ export function mergeAndRankVideos(params: {
         existing.streamKind === 'muxed' || candidate.streamKind !== 'muxed'
           ? existing.streamKind
           : candidate.streamKind,
-      filename: candidate.filename || existing.filename,
+      filename: sanitizeVideoFilename(mergedTitle, mergedExt, mergedQuality),
       note: existing.note || candidate.note,
     });
   };
@@ -391,5 +480,58 @@ export function mergeAndRankVideos(params: {
       score: scoreDetectedVideo(v),
     }))
     .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Deduplicate streams for the same video so that ONLY ONE best / highest quality
+ * video is shown to the user (clean and simple, zero dropdown clutter).
+ */
+export function dedupeToBestPerVideo(videos: DetectedVideo[]): DetectedVideo[] {
+  if (!videos || videos.length <= 1) return videos;
+
+  const audioList: DetectedVideo[] = [];
+  const bestVideoByGroup = new Map<string, DetectedVideo>();
+
+  for (const v of videos) {
+    if (v.streamKind === 'audio-only' || v.format === 'audio') {
+      audioList.push(v);
+      continue;
+    }
+
+    const cleanTitle = (v.title || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const key = cleanTitle || 'video_default';
+    const existing = bestVideoByGroup.get(key);
+
+    if (!existing) {
+      bestVideoByGroup.set(key, v);
+    } else {
+      const existingH = parseQualityHeight(existing.quality, existing.height);
+      const currentH = parseQualityHeight(v.quality, v.height);
+      const existingSize = existing.sizeBytes || 0;
+      const currentSize = v.sizeBytes || 0;
+
+      const isCurrentBetter =
+        currentH > existingH ||
+        (currentH === existingH && currentSize > existingSize) ||
+        (currentH === existingH && currentSize === existingSize && v.score > existing.score);
+
+      if (isCurrentBetter) {
+        bestVideoByGroup.set(key, {
+          ...v,
+          durationSeconds: v.durationSeconds || existing.durationSeconds,
+          thumbnailUrl: v.thumbnailUrl || existing.thumbnailUrl,
+        });
+      } else {
+        if (!existing.durationSeconds && v.durationSeconds) {
+          existing.durationSeconds = v.durationSeconds;
+        }
+        if (!existing.thumbnailUrl && v.thumbnailUrl) {
+          existing.thumbnailUrl = v.thumbnailUrl;
+        }
+      }
+    }
+  }
+
+  return [...bestVideoByGroup.values(), ...audioList].sort((a, b) => b.score - a.score);
 }
 

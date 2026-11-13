@@ -269,7 +269,7 @@ describe('Z-Pilot v2 integration: planner, scanner, downloader & UI', () => {
     expect(screen.getByText(/Why 720p \/ 1080p \/ 4K isn't shown here/i)).toBeTruthy();
     expect(screen.getByText('v42.www-y2mate.com')).toBeTruthy();
 
-    fireEvent.click(screen.getByText(/Open Y2mate & Auto-Fill HD/i));
+    fireEvent.click(screen.getByText(/Open For High Quality|Open Y2mate & Auto-Fill HD/i));
     await waitFor(() => {
       expect(writeTextMock).toHaveBeenCalledWith(ytUrl);
       expect(sendMessageMock).toHaveBeenCalledWith(

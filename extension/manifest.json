@@ -30,7 +30,7 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "permissions": [
@@ -41,10 +41,16 @@
     "storage",
     "downloads",
     "webRequest",
-    "declarativeNetRequestWithHostAccess"
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "alarms",
+    "notifications",
+    "clipboardRead",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "<all_urls>",
-    "https://generativelanguage.googleapis.com/*"
+    "https://generativelanguage.googleapis.com/*",
+    "https://ntfy.sh/*"
   ]
 }

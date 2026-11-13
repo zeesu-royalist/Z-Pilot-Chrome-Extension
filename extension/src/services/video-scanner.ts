@@ -10,6 +10,8 @@ import {
   RawDomVideoCandidate,
   RawYouTubeFormatCandidate,
   selectDownloadableYouTubeFormats,
+  isGenericTitle,
+  extractTitleFromUrl,
 } from './video-deduper.js';
 
 /**
@@ -396,15 +398,21 @@ export const VideoScannerService = {
       pageUrl.includes('youtube.com/live') ||
       pageUrl.includes('youtu.be/');
 
-    const topDomPromise = (async (): Promise<RawDomVideoCandidate[]> => {
+    const topDomPromise = (async (): Promise<{
+      candidates: RawDomVideoCandidate[];
+      pageTitle?: string;
+    }> => {
       const ready = await BrowserActionService.ensureContentScript(tabId, pageUrl);
-      if (!ready) return [];
-      return new Promise<RawDomVideoCandidate[]>((resolve) => {
+      if (!ready) return { candidates: [] };
+      return new Promise<{ candidates: RawDomVideoCandidate[]; pageTitle?: string }>((resolve) => {
         chrome.tabs.sendMessage(tabId, { type: 'SCAN_VIDEOS' }, (res) => {
           if (chrome.runtime.lastError || !res?.videos) {
-            resolve([]);
+            resolve({ candidates: [] });
           } else {
-            resolve(res.videos as RawDomVideoCandidate[]);
+            resolve({
+              candidates: (res.videos || []) as RawDomVideoCandidate[],
+              pageTitle: (res.title || undefined) as string | undefined,
+            });
           }
         });
       });
@@ -474,15 +482,21 @@ export const VideoScannerService = {
       youtubePromise,
     ]);
 
+    const topDomData = topDomRes.status === 'fulfilled' ? topDomRes.value : { candidates: [] };
     const rawDomCandidates: RawDomVideoCandidate[] = [
-      ...(topDomRes.status === 'fulfilled' ? topDomRes.value : []),
+      ...topDomData.candidates,
       ...(framesRes.status === 'fulfilled' ? framesRes.value.candidates : []),
     ];
     const domFrames = framesRes.status === 'fulfilled' ? framesRes.value.frameCount : 1;
     const networkEntries = networkRes.status === 'fulfilled' ? networkRes.value : [];
     const ytData = youtubeRes.status === 'fulfilled' ? youtubeRes.value : null;
 
-    const effectiveTitle = ytData?.title || pageTitle;
+    const domBestTitle =
+      topDomData.pageTitle && !isGenericTitle(topDomData.pageTitle, pageUrl)
+        ? topDomData.pageTitle
+        : rawDomCandidates.find((c) => c.title && !isGenericTitle(c.title, pageUrl))?.title;
+
+    const effectiveTitle = ytData?.title || domBestTitle || pageTitle;
     const curatedYoutubeFormats = selectDownloadableYouTubeFormats(ytData?.formats || []);
 
     // On YouTube, show ONLY verified downloadable muxed videos (ignore raw googlevideo/DOM fragments)
@@ -496,11 +510,21 @@ export const VideoScannerService = {
       ? networkEntries.filter((e) => !e.url.includes('googlevideo.com/videoplayback'))
       : networkEntries;
 
-    const enrichedNetwork = filteredNetwork.map((entry) => ({
-      ...entry,
-      titleHint: entry.titleHint || effectiveTitle,
-      durationSeconds: entry.durationSeconds || ytData?.durationSeconds,
-    }));
+    const enrichedNetwork = filteredNetwork.map((entry) => {
+      const urlTitle = extractTitleFromUrl(entry.url);
+      const titleHint =
+        entry.titleHint && !isGenericTitle(entry.titleHint, pageUrl)
+          ? entry.titleHint
+          : effectiveTitle && !isGenericTitle(effectiveTitle, pageUrl)
+          ? effectiveTitle
+          : urlTitle || pageTitle;
+
+      return {
+        ...entry,
+        titleHint,
+        durationSeconds: entry.durationSeconds || ytData?.durationSeconds,
+      };
+    });
 
     // Expand up to 4 HLS master playlists in parallel so other websites show full HD/4K choices
     const hlsUrls = new Set<string>();

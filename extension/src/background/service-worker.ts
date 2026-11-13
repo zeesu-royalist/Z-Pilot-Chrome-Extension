@@ -9,11 +9,14 @@ import {
   autoFillY2matePage,
   Y2MATE_YOUTUBE_URL,
 } from '../services/y2mate-autofill.js';
+import { StorageService } from '../services/storage.js';
+import { AdBlockerService } from '../services/ad-blocker.js';
 
 const SESSION_MEDIA_KEY = 'zpilot_sniffed_media_v2';
 const mediaStore = new TabMediaStore(30, 60);
 const tabUrlMap = new Map<number, string>();
 const activeDownloadToVideoId = new Map<number, string>();
+const activeDownloadToFilename = new Map<number, string>();
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let isHydrated = false;
@@ -265,11 +268,29 @@ async function setDownloadRefererRule(mediaUrl: string, pageUrl: string): Promis
 // Hydrate immediately when worker wakes up
 hydrateMediaStore();
 ensureYouTubeDnrRules();
+AdBlockerService.syncDnrRules();
 
 // Configure the side panel to open on action button click
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[Z-Pilot] Extension installed / updated.');
   ensureYouTubeDnrRules();
+  AdBlockerService.syncDnrRules();
+
+  // Auto-inject content script into open tabs so user doesn't have to reload existing tabs
+  if (chrome.tabs && chrome.scripting) {
+    chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] }).then((tabs) => {
+      for (const tab of tabs) {
+        if (tab.id) {
+          chrome.scripting
+            .executeScript({
+              target: { tabId: tab.id },
+              files: ['content.js'],
+            })
+            .catch(() => {});
+        }
+      }
+    }).catch(() => {});
+  }
 
   if (chrome.sidePanel && 'setPanelBehavior' in chrome.sidePanel) {
     chrome.sidePanel
@@ -427,6 +448,16 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Native Chrome Downloads Progress Tracking
 // ============================================================================
 
+if (chrome.downloads?.onDeterminingFilename) {
+  chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+    const intended = activeDownloadToFilename.get(item.id);
+    if (intended) {
+      suggest({ filename: intended, conflictAction: 'uniquify' });
+      return true;
+    }
+  });
+}
+
 if (chrome.downloads?.onChanged) {
   chrome.downloads.onChanged.addListener((delta) => {
     const videoId = activeDownloadToVideoId.get(delta.id);
@@ -455,6 +486,7 @@ if (chrome.downloads?.onChanged) {
           status = 'completed';
         }
         activeDownloadToVideoId.delete(delta.id);
+        activeDownloadToFilename.delete(delta.id);
       } else if (item.state === 'interrupted') {
         if (item.error === 'USER_CANCELED') {
           status = 'cancelled';
@@ -464,6 +496,7 @@ if (chrome.downloads?.onChanged) {
           message = item.error || 'Download interrupted';
         }
         activeDownloadToVideoId.delete(delta.id);
+        activeDownloadToFilename.delete(delta.id);
       }
 
       broadcastMessage({
@@ -488,6 +521,25 @@ if (chrome.downloads?.onChanged) {
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   switch (request.type) {
+    case 'CLIPBOT_COPY': {
+      const { text, sourceUrl, sourceTitle } = request as {
+        text?: string;
+        sourceUrl?: string;
+        sourceTitle?: string;
+      };
+      if (text && typeof text === 'string' && text.trim().length > 0) {
+        StorageService.addClipbotItem(text, sourceUrl, sourceTitle)
+          .then((items) => {
+            broadcastMessage({ type: 'CLIPBOT_UPDATED', items });
+            sendResponse({ ok: true, count: items.length });
+          })
+          .catch(() => sendResponse({ ok: false }));
+        return true;
+      }
+      sendResponse({ ok: false });
+      return false;
+    }
+
     case 'ENSURE_YT_DNR_RULES': {
       if (dnrRulesReady) {
         sendResponse({ ok: true });
@@ -577,6 +629,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
                     });
                   } else {
                     if (videoId) activeDownloadToVideoId.set(retryId, videoId);
+                    activeDownloadToFilename.set(retryId, flatFilename);
                     sendResponse({ success: true, downloadId: retryId });
                   }
                 }
@@ -593,6 +646,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
           if (videoId) {
             activeDownloadToVideoId.set(downloadId, videoId);
           }
+          activeDownloadToFilename.set(downloadId, cleanFilename);
           sendResponse({ success: true, downloadId });
         }
       );
@@ -706,6 +760,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       if (chrome.downloads && downloadId) {
         chrome.downloads.cancel(downloadId, () => {
           activeDownloadToVideoId.delete(downloadId);
+          activeDownloadToFilename.delete(downloadId);
           sendResponse({ ok: true });
         });
         return true;
@@ -714,7 +769,60 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       return false;
     }
 
+    case 'AD_ELEMENTS_BLOCKED': {
+      const { count } = request as { count: number };
+      if (typeof count === 'number' && count > 0) {
+        AdBlockerService.incrementBlockedCount(count);
+      }
+      sendResponse({ ok: true });
+      return false;
+    }
+
     default:
       return false;
   }
 });
+
+// ============================================================================
+// TODO & REMINDER NOTIFICATIONS (chrome.alarms + chrome.notifications)
+// ============================================================================
+
+if (typeof chrome !== 'undefined' && chrome.alarms) {
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name.startsWith('todo_')) {
+      const todoId = alarm.name.replace('todo_', '');
+      try {
+        const result = await chrome.storage.local.get('zpilot_todos');
+        const todos = Array.isArray(result.zpilot_todos) ? result.zpilot_todos : [];
+        const todo = todos.find((t: { id: string }) => t.id === todoId);
+        if (todo && !todo.completed && !todo.notified) {
+          if (chrome.notifications) {
+            chrome.notifications.create(`notif_${todo.id}`, {
+              type: 'basic',
+              iconUrl: 'icons/icon128.png',
+              title: '⏰ Z-Pilot Task Reminder',
+              message: todo.title + (todo.description ? ` - ${todo.description}` : ''),
+              priority: 2,
+              requireInteraction: true,
+            });
+          }
+          const updated = todos.map((t: { id: string }) =>
+            t.id === todoId ? { ...t, notified: true } : t
+          );
+          await chrome.storage.local.set({ zpilot_todos: updated });
+          broadcastMessage({ type: 'TODO_REMINDER_ALERT', todo });
+        }
+      } catch (err) {
+        console.error('[ServiceWorker] Alarm handling error:', err);
+      }
+    }
+  });
+}
+
+if (typeof chrome !== 'undefined' && chrome.notifications?.onClicked) {
+  chrome.notifications.onClicked.addListener((notifId) => {
+    if (notifId.startsWith('notif_')) {
+      chrome.notifications.clear(notifId);
+    }
+  });
+}

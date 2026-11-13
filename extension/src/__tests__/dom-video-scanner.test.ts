@@ -67,5 +67,32 @@ describe('dom-video-scanner', () => {
       'Interview Episode'
     );
   });
+
+  it('extracts specific video and lesson title on course pages when page title is generic site brand', () => {
+    document.title = 'Apna College';
+    document.head.innerHTML = '';
+    document.body.innerHTML = `
+      <div class="course-syllabus">
+        <div class="module-title">08 Installation</div>
+        <div class="lesson-item active">
+          <span class="lesson-num">95</span>
+          <span class="lesson-name">Installing Anaconda</span>
+          <span class="badge">VIDEO</span>
+        </div>
+        <div class="lesson-item">
+          <span class="lesson-num">96</span>
+          <span class="lesson-name">Conda Prompt</span>
+          <span class="badge">VIDEO</span>
+        </div>
+      </div>
+      <div class="video-container">
+        <video src="https://cdn.example.com/lecture.mp4"></video>
+      </div>
+    `;
+
+    const candidates = scanDocumentVideos(document, 'https://apnacollege.in/course/python');
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].title).toBe('95 Installing Anaconda');
+  });
 });
 
