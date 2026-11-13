@@ -198,37 +198,37 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Home view — premium minimal header
   return (
-    <header className="flex items-center justify-between px-4 py-3 sticky top-0 z-20 backdrop-blur-md border-b border-white/[0.04]">
-      {/* Brand — logo + badge */}
+    <header className="flex items-center justify-between px-3 sm:px-4 py-2.5 sticky top-0 z-20">
+      {/* Brand — logo + stacked text matching reference image */}
       <div className="flex items-center space-x-2.5">
-        <BrandMark size={26} className="object-contain shrink-0" />
-        <div className="flex items-center space-x-2">
-          <span className="font-bold text-sm tracking-tight text-white">
-            Z-Pilot
+        <BrandMark size={32} className="object-contain shrink-0" />
+        <div className="flex flex-col leading-tight">
+          <span className="font-bold text-base tracking-tight text-white leading-tight drop-shadow-sm">
+            Z-Pilot,
           </span>
-          <span className="text-[10px] font-medium text-zinc-400 bg-white/[0.05] border border-white/[0.08] px-2 py-0.5 rounded-full">
+          <span className="text-xs text-white/80 font-normal leading-tight mt-0.5">
             Browser Agent
           </span>
         </div>
       </div>
 
-      {/* Right: User + Settings — sleek minimal pill */}
-      <div className="flex items-center space-x-1 bg-white/[0.04] border border-white/[0.08] p-1 rounded-xl">
+      {/* Right: Individual circular frosted buttons matching reference image */}
+      <div className="flex items-center space-x-2">
         <button
           type="button"
           onClick={handleOpenWebsite}
-          title="Visit Creator Website"
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer active:scale-95"
+          title="Visit Creator Website (zeesu-royalist.vercel.app)"
+          className="w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-sm active:scale-95"
         >
-          <User className="w-3.5 h-3.5 stroke-[1.8]" />
+          <User className="w-4 h-4 stroke-[1.75]" />
         </button>
         <button
           type="button"
           onClick={onOpenSettings}
           title="Settings & API Key"
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all cursor-pointer active:scale-95"
+          className="w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-sm active:scale-95"
         >
-          <Settings className="w-3.5 h-3.5 stroke-[1.8]" />
+          <Settings className="w-4 h-4 stroke-[1.75]" />
         </button>
       </div>
     </header>

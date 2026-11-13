@@ -202,20 +202,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col justify-between min-h-full px-4 pt-3 pb-4 font-sans animate-fade-in overflow-y-auto no-scrollbar gap-4">
+    <div className="flex flex-col justify-between min-h-full px-3 sm:px-4 pt-3 pb-4 font-sans animate-fade-in overflow-y-auto no-scrollbar gap-3 sm:gap-4">
       {/* Top Hero Section */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Hero Title & Browsing Context */}
         <div className="pt-1">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-tight">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-tight drop-shadow-sm">
             How can I help<br />you to browse today ?
           </h1>
-          {currentPageTitle && (
-            <div className="flex items-center space-x-1.5 text-[11px] text-zinc-400 mt-1 truncate">
-              <Globe className="w-3 h-3 text-zinc-500 shrink-0" />
-              <span className="truncate">{currentPageTitle}</span>
-            </div>
-          )}
         </div>
 
         {/* 🚀 First-Time Quick Setup Box (if API key not set) */}
@@ -278,11 +272,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
             {feedback && (
               <div
-                className={`p-2 rounded-lg text-[11px] flex items-start space-x-1.5 ${
-                  feedback.success
+                className={`p-2 rounded-lg text-[11px] flex items-start space-x-1.5 ${feedback.success
                     ? 'bg-orange-950/40 border border-orange-500/30 text-orange-200'
                     : 'bg-rose-950/40 border border-rose-500/30 text-rose-300'
-                }`}
+                  }`}
               >
                 {feedback.success ? (
                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-orange-400" />
@@ -309,11 +302,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   type="button"
                   onClick={() => setShowQuickGuide(!showQuickGuide)}
                   title={showQuickGuide ? 'Hide instructions' : 'How to get an API key step-by-step'}
-                  className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
-                    showQuickGuide
+                  className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all cursor-pointer ${showQuickGuide
                       ? 'bg-orange-500 text-white border-orange-400'
                       : 'bg-white/5 hover:bg-orange-500/20 text-orange-400 border-orange-500/30'
-                  }`}
+                    }`}
                 >
                   <Info className="w-3 h-3" />
                 </button>
@@ -371,28 +363,25 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         {/* ── Quick Tools Dock (4x2 Sleek App Launcher) ── */}
         <div>
           <div className="flex items-center justify-between px-0.5 mb-2">
-            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-              Quick Tools
-            </span>
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
             {appLauncherItems.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={item.onClick}
                 title={item.title}
-                className="relative flex flex-col items-center justify-center py-2 px-1 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] hover:border-orange-500/30 transition-all cursor-pointer group active:scale-95 text-center focus:outline-none"
+                className="relative flex flex-col items-center justify-center py-2 px-0.5 rounded-xl bg-black/20 hover:bg-black/35 border border-white/15 hover:border-white/30 transition-all cursor-pointer group active:scale-95 text-center focus:outline-none backdrop-blur-md shadow-sm"
               >
                 {item.badge !== undefined && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-orange-500 text-[9px] font-bold text-white flex items-center justify-center font-mono leading-none shadow-sm">
+                  <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-[9px] font-bold text-white flex items-center justify-center font-mono leading-none shadow-md border border-[#1b0802]">
                     {item.badge}
                   </span>
                 )}
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 group-hover:text-orange-400 transition-colors">
-                  <item.icon className="w-4 h-4 stroke-[1.8]" />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white/90 group-hover:text-amber-200 transition-colors">
+                  <item.icon className="w-[18px] h-[18px] stroke-[2]" />
                 </div>
-                <span className="text-[11px] font-medium text-zinc-300 group-hover:text-white mt-0.5 leading-tight truncate max-w-full px-0.5 transition-colors">
+                <span className="text-[11px] font-semibold text-white group-hover:text-amber-100 mt-1 leading-tight truncate max-w-full px-0.5 transition-colors drop-shadow-sm">
                   {item.label}
                 </span>
               </button>
@@ -403,23 +392,23 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         {/* ── Suggested Actions (2x2 Reference Matching Cards) ── */}
         <div>
           <div className="flex items-center justify-between px-0.5 mb-2">
-            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
+            <span className="text-[11px] font-bold text-white/90 uppercase tracking-wider drop-shadow-sm">
               Suggested Actions
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
             {promptCards.map((card, idx) => {
               const IconComponent = card.icon;
               return (
                 <button
                   key={idx}
                   onClick={() => onSelectPrompt(card.prompt)}
-                  className="p-3.5 rounded-2xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] hover:border-orange-500/30 text-left transition-all group cursor-pointer shadow-sm flex flex-col justify-between min-h-[92px] active:scale-[0.98] focus:outline-none"
+                  className="p-3 sm:p-3.5 rounded-2xl bg-black/20 hover:bg-black/35 border border-white/15 hover:border-white/30 text-left transition-all group cursor-pointer shadow-sm backdrop-blur-md flex flex-col justify-between min-h-[88px] sm:min-h-[92px] active:scale-[0.98] focus:outline-none"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 group-hover:text-orange-300 group-hover:bg-orange-500/20 transition-all">
-                    <IconComponent className="w-4 h-4 stroke-[1.75]" />
+                  <div className="w-8 h-8 rounded-xl bg-orange-500/20 border border-orange-400/35 flex items-center justify-center text-orange-200 group-hover:text-white transition-all shadow-inner">
+                    <IconComponent className="w-4 h-4 stroke-[2]" />
                   </div>
-                  <div className="text-xs sm:text-[13px] font-semibold text-white/90 leading-snug group-hover:text-white transition-colors mt-2">
+                  <div className="text-xs sm:text-[13px] font-bold text-white leading-snug group-hover:text-amber-100 transition-colors mt-2 drop-shadow-sm">
                     {card.title}
                   </div>
                 </button>
@@ -430,7 +419,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       </div>
 
       {/* ── Bottom Input Bar (Reference Matching Command Box) ── */}
-      <div className="mt-2 rounded-3xl bg-[#121214]/95 backdrop-blur-xl border border-white/[0.08] p-4 shadow-2xl">
+      <div className="mt-2 rounded-3xl bg-black/60 backdrop-blur-xl border border-white/15 p-3.5 sm:p-4 shadow-xl">
         <form onSubmit={handleHomeSubmit}>
           <textarea
             value={homeInput}
@@ -443,24 +432,24 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             }}
             rows={2}
             placeholder="Ask anything about this page, fill forms, or search web..."
-            className="w-full bg-transparent resize-none text-[13px] text-white placeholder-zinc-500 focus:outline-none leading-relaxed font-sans"
+            className="w-full bg-transparent resize-none text-[13px] text-white placeholder-white/55 focus:outline-none leading-relaxed font-sans"
           />
         </form>
 
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/[0.06]">
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/15">
           <div className="flex items-center space-x-2">
             <div
               title={currentPageTitle ? `Active context: ${currentPageTitle}` : 'Attach context'}
-              className="w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/10 border border-white/[0.08] flex items-center justify-center text-zinc-400 hover:text-white transition-all cursor-pointer"
+              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white/90 hover:text-white transition-all cursor-pointer"
             >
-              <Paperclip className="w-3.5 h-3.5 stroke-[1.75]" />
+              <Paperclip className="w-3.5 h-3.5 stroke-[2]" />
             </div>
 
             <button
               type="button"
               onClick={onOpenSettings}
               title="Change Gemini Model"
-              className="px-3 py-1.5 rounded-full bg-white/[0.06] hover:bg-white/10 border border-white/[0.08] text-xs font-medium text-zinc-300 hover:text-white flex items-center space-x-1.5 transition-all cursor-pointer"
+              className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold text-white flex items-center space-x-1.5 transition-all cursor-pointer"
             >
               <span>
                 {geminiModel.includes('2.5')
@@ -469,7 +458,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                     ? 'Flash 3.5 Lite'
                     : 'Flash 3.5'}
               </span>
-              <span className="text-[10px] text-zinc-500">▾</span>
+              <span className="text-[10px] text-white/70">▾</span>
             </button>
           </div>
 
