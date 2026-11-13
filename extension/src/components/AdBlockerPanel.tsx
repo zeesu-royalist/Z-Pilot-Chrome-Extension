@@ -4,12 +4,10 @@ import {
   ShieldAlert,
   ShieldCheck,
   RotateCcw,
-  Sparkles,
   Tv,
   EyeOff,
   Layers,
   Globe,
-  Flame,
 } from 'lucide-react';
 import { BrandMark } from './BrandLogo.js';
 import { AdBlockerService, DEFAULT_AD_BLOCKER_SETTINGS } from '../services/ad-blocker.js';
@@ -241,7 +239,6 @@ export const AdBlockerPanel: React.FC<AdBlockerPanelProps> = ({
           {/* Page Stats */}
           <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-md space-y-1">
             <div className="flex items-center space-x-1.5 text-white/50 text-[10px] uppercase font-bold tracking-wider">
-              <Sparkles className="w-3 h-3 text-orange-400" />
               <span>On This Page</span>
             </div>
             <p className="text-2xl font-extrabold font-mono text-white tracking-tight">
@@ -253,7 +250,6 @@ export const AdBlockerPanel: React.FC<AdBlockerPanelProps> = ({
           {/* All-Time Stats */}
           <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-md space-y-1">
             <div className="flex items-center space-x-1.5 text-white/50 text-[10px] uppercase font-bold tracking-wider">
-              <Flame className="w-3 h-3 text-amber-400" />
               <span>All-Time Blocked</span>
             </div>
             <p className="text-2xl font-extrabold font-mono text-amber-200 tracking-tight">
