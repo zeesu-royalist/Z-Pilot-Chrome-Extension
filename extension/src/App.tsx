@@ -5,16 +5,22 @@ import {
   PageContext,
   UserSettings,
   UserProfile,
+  DetectedVideo,
+  VideoScanResult,
+  VideoDownloadProgress,
 } from './types/index.js';
 import { StorageService } from './services/storage.js';
 import { ApiService } from './services/api.js';
 import { BrowserActionService } from './services/browser-actions.js';
+import { VideoScannerService } from './services/video-scanner.js';
+import { VideoDownloaderService } from './services/video-downloader.js';
 import { Header } from './components/Header.js';
 import { WelcomeScreen } from './components/WelcomeScreen.js';
 import { ChatWindow } from './components/ChatWindow.js';
 import { ChatInput } from './components/ChatInput.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
 import { ProfileModal } from './components/ProfileModal.js';
+import { VideoScannerPanel } from './components/VideoScannerPanel.js';
 
 export const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -31,6 +37,17 @@ export const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Video Scanner & Downloader v2 State
+  const [isVideoScannerOpen, setIsVideoScannerOpen] = useState(false);
+  const [isScanningVideos, setIsScanningVideos] = useState(false);
+  const [videoScanResult, setVideoScanResult] = useState<VideoScanResult | null>(null);
+  const [downloadProgressMap, setDownloadProgressMap] = useState<
+    Record<string, VideoDownloadProgress>
+  >({});
+  const [sniffedCount, setSniffedCount] = useState(0);
+  const activeTabIdRef = useRef<number>(0);
+  const scanAbortRef = useRef<AbortController | null>(null);
 
   // Cancellation ref for ongoing action sequence
   const cancelExecutionRef = useRef(false);
@@ -73,9 +90,46 @@ export const App: React.FC = () => {
       if (chrome.tabs.onActivated) chrome.tabs.onActivated.addListener(handleActivated);
       if (chrome.tabs.onUpdated) chrome.tabs.onUpdated.addListener(handleUpdated);
 
+      const handleRuntimeMessage = (msg: {
+        type?: string;
+        tabId?: number;
+        count?: number;
+        progress?: VideoDownloadProgress;
+      }) => {
+        if (msg.type === 'SNIFFED_MEDIA_UPDATED' && msg.tabId === activeTabIdRef.current) {
+          setSniffedCount(msg.count || 0);
+        } else if (msg.type === 'DOWNLOAD_PROGRESS' && msg.progress) {
+          const p = msg.progress;
+          if (p.status === 'completed' || p.status === 'failed' || p.status === 'cancelled') {
+            VideoDownloaderService.markFinished(p.videoId);
+            if (p.status === 'completed') {
+              setTimeout(() => {
+                setDownloadProgressMap((prev) => {
+                  if (!prev[p.videoId] || prev[p.videoId].status !== 'completed') return prev;
+                  const next = { ...prev };
+                  delete next[p.videoId];
+                  return next;
+                });
+              }, 3500);
+            }
+          }
+          setDownloadProgressMap((prev) => ({
+            ...prev,
+            [p.videoId]: p,
+          }));
+        }
+      };
+
+      if (chrome.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener(handleRuntimeMessage);
+      }
+
       return () => {
         if (chrome.tabs.onActivated) chrome.tabs.onActivated.removeListener(handleActivated);
         if (chrome.tabs.onUpdated) chrome.tabs.onUpdated.removeListener(handleUpdated);
+        if (chrome.runtime?.onMessage) {
+          chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
+        }
       };
     }
   }, []);
@@ -89,11 +143,127 @@ export const App: React.FC = () => {
 
   const refreshContext = async () => {
     try {
-      const ctx = await BrowserActionService.getPageContext();
+      const [ctx, tab] = await Promise.all([
+        BrowserActionService.getPageContext(),
+        BrowserActionService.getActiveTab(),
+      ]);
       setPageContext(ctx);
+      if (tab?.id) {
+        activeTabIdRef.current = tab.id;
+        const count = await VideoScannerService.getSniffedCount(tab.id);
+        setSniffedCount(count);
+      }
     } catch (err) {
       console.warn('[App] Error refreshing page context:', err);
     }
+  };
+
+  /**
+   * 1-Click Video Scan: opens panel and immediately runs parallel DOM + Network + YouTube + HLS scan
+   */
+  const runVideoScan = async () => {
+    if (scanAbortRef.current) {
+      scanAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
+
+    setIsScanningVideos(true);
+    try {
+      const result = await VideoScannerService.scanActiveTab(controller.signal);
+      if (!controller.signal.aborted) {
+        setVideoScanResult(result);
+        if (result.tabId) activeTabIdRef.current = result.tabId;
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setIsScanningVideos(false);
+      }
+    }
+  };
+
+  const handleOpenVideoScanner = () => {
+    setIsVideoScannerOpen(true);
+    runVideoScan();
+  };
+
+  /**
+   * 2nd-Click Video Download
+   */
+  const handleDownloadVideo = (video: DetectedVideo) => {
+    const isBusy = Object.values(downloadProgressMap).some(
+      (p) => p && (p.status === 'preparing' || p.status === 'downloading' || p.status === 'muxing')
+    );
+    if (isBusy) return;
+
+    const tabId = videoScanResult?.tabId || activeTabIdRef.current;
+    const pageUrl = videoScanResult?.pageUrl || pageContext?.url;
+    VideoDownloaderService.downloadVideo(
+      video,
+      tabId,
+      (progress) => {
+        setDownloadProgressMap((prev) => ({
+          ...prev,
+          [progress.videoId]: progress,
+        }));
+        if (progress.status === 'completed') {
+          setTimeout(() => {
+            setDownloadProgressMap((prev) => {
+              if (!prev[progress.videoId] || prev[progress.videoId].status !== 'completed') return prev;
+              const next = { ...prev };
+              delete next[progress.videoId];
+              return next;
+            });
+          }, 3500);
+        }
+      },
+      pageUrl
+    );
+  };
+
+  const handleDownloadAudio = (video: DetectedVideo) => {
+    const isBusy = Object.values(downloadProgressMap).some(
+      (p) => p && (p.status === 'preparing' || p.status === 'downloading' || p.status === 'muxing')
+    );
+    if (isBusy) return;
+
+    const tabId = videoScanResult?.tabId || activeTabIdRef.current;
+    const pageUrl = videoScanResult?.pageUrl || pageContext?.url;
+    VideoDownloaderService.downloadAudioOnly(
+      video,
+      tabId,
+      (progress) => {
+        setDownloadProgressMap((prev) => ({
+          ...prev,
+          [progress.videoId]: progress,
+        }));
+        if (progress.status === 'completed') {
+          setTimeout(() => {
+            setDownloadProgressMap((prev) => {
+              if (!prev[progress.videoId] || prev[progress.videoId].status !== 'completed') return prev;
+              const next = { ...prev };
+              delete next[progress.videoId];
+              return next;
+            });
+          }, 3500);
+        }
+      },
+      pageUrl
+    );
+  };
+
+  const handleCancelVideoDownload = (video: DetectedVideo) => {
+    VideoDownloaderService.cancelDownload(video.id);
+    setDownloadProgressMap((prev) => ({
+      ...prev,
+      [video.id]: {
+        videoId: video.id,
+        status: 'cancelled',
+        percent: 0,
+        bytesDownloaded: 0,
+        message: 'Download cancelled',
+      },
+    }));
   };
 
   /**
@@ -222,6 +392,10 @@ export const App: React.FC = () => {
 
       if (result.success) {
         updateActionStatus(messageId, currentAction.id, 'completed', result.message);
+        if (currentAction.type === 'SCAN_VIDEOS' && result.data) {
+          setVideoScanResult(result.data as VideoScanResult);
+          setIsVideoScannerOpen(true);
+        }
       } else {
         updateActionStatus(messageId, currentAction.id, 'failed', result.message);
         // On failure, abort subsequent actions
@@ -378,6 +552,8 @@ export const App: React.FC = () => {
         geminiModel={settings.geminiModel}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onNewChat={handleNewChat}
+        onOpenVideoScanner={handleOpenVideoScanner}
+        detectedVideoCount={sniffedCount}
         hasMessages={messages.length > 0}
       />
 
@@ -387,9 +563,12 @@ export const App: React.FC = () => {
           <WelcomeScreen
             onSelectPrompt={(prompt: string) => handleSendMessage(prompt)}
             currentPageTitle={pageContext?.title}
+            geminiModel={settings.geminiModel}
             isApiKeyConfigured={isApiKeyConfigured}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onSaveApiKey={handleSaveApiKey}
+            onOpenVideoScanner={handleOpenVideoScanner}
+            detectedVideoCount={sniffedCount}
           />
         </div>
       ) : (
@@ -434,6 +613,19 @@ export const App: React.FC = () => {
           setIsSettingsOpen(false);
           setIsProfileOpen(true);
         }}
+      />
+
+      {/* Video Scanner & Downloader Modal */}
+      <VideoScannerPanel
+        isOpen={isVideoScannerOpen}
+        onClose={() => setIsVideoScannerOpen(false)}
+        isScanning={isScanningVideos}
+        scanResult={videoScanResult}
+        progressMap={downloadProgressMap}
+        onScan={runVideoScan}
+        onDownload={handleDownloadVideo}
+        onDownloadAudio={handleDownloadAudio}
+        onCancelDownload={handleCancelVideoDownload}
       />
 
       {/* User Autofill Profile Modal */}

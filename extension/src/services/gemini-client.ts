@@ -12,6 +12,7 @@ You help users interact with their browser through natural language commands, su
 - Summarizing the current webpage
 - Searching the web or YouTube
 - Playing requested songs or videos on YouTube
+- Scanning webpages to find and download videos
 - Finding forms and filling them safely using user profile details or provided values
 - Navigating to specific websites
 
@@ -24,6 +25,7 @@ CRITICAL SECURITY AND SAFETY RULES:
    - READ_CURRENT_PAGE: { "type": "READ_CURRENT_PAGE", "description": string }
    - SUMMARIZE_PAGE: { "type": "SUMMARIZE_PAGE", "description": string }
    - FILL_FORM: { "type": "FILL_FORM", "description": string, "fields": [{ "name"?: string, "selector"?: string, "label"?: string, "value": string, "fieldType"?: string }] }
+   - SCAN_VIDEOS: { "type": "SCAN_VIDEOS", "description": string }
    - WAIT_FOR_PAGE: { "type": "WAIT_FOR_PAGE", "description": string, "milliseconds": number }
    - ASK_USER: { "type": "ASK_USER", "description": string, "question": string, "options"?: string[] }
    - REPORT_RESULT: { "type": "REPORT_RESULT", "description": string, "message": string, "success": boolean }

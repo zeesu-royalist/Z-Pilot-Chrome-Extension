@@ -1,8 +1,10 @@
 /**
  * Z-Pilot Page Agent (Content Script)
  * Executes DOM inspection, text extraction, form discovery, form filling,
- * and media playback on the active webpage.
+ * media playback, and deep DOM video scanning on the active webpage.
  */
+
+import { scanDocumentVideos } from './dom-video-scanner.js';
 
 // Prevent duplicate execution if re-injected
 if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_PAGE_AGENT_LOADED) {
@@ -384,6 +386,16 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
           selectedText: selection,
           extractedText: text,
           forms,
+        });
+        return false;
+      }
+
+      case 'SCAN_VIDEOS': {
+        const videos = scanDocumentVideos(document, window.location.href);
+        sendResponse({
+          url: window.location.href,
+          title: document.title,
+          videos,
         });
         return false;
       }

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Z-Pilot - AI Browser Assistant",
-  "version": "1.0.0",
-  "description": "AI-Powered Browser Assistant & Automation Agent powered by Zeesu Royalist",
+  "version": "2.0.0",
+  "description": "AI-Powered Browser Assistant, Automation Agent & Universal Video Downloader powered by Zeesu Royalist",
   "author": "Zeesu Royalist",
   "icons": {
     "16": "icons/icon16.png",
@@ -38,7 +38,10 @@
     "tabs",
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "downloads",
+    "webRequest",
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
     "<all_urls>",

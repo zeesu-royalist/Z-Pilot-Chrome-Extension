@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, X, User, Home } from 'lucide-react';
+import { Settings, X, User, Home, Film } from 'lucide-react';
 import { BrandMark } from './BrandLogo.js';
 
 interface HeaderProps {
@@ -7,6 +7,8 @@ interface HeaderProps {
   geminiModel?: string;
   onOpenSettings: () => void;
   onNewChat: () => void;
+  onOpenVideoScanner: () => void;
+  detectedVideoCount?: number;
   hasMessages?: boolean;
   websiteUrl?: string;
 }
@@ -14,6 +16,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onNewChat,
+  onOpenVideoScanner,
+  detectedVideoCount = 0,
   hasMessages = false,
   websiteUrl = 'https://zeesu-royalist.vercel.app',
 }) => {
@@ -46,14 +50,29 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="font-medium">Close chat</span>
         </button>
 
-        {/* Right Settings Button */}
-        <button
-          onClick={onOpenSettings}
-          title="Settings & API Key"
-          className="w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/60 border border-white/15 text-white/80 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
-        >
-          <Settings className="w-4 h-4 stroke-[1.75]" />
-        </button>
+        {/* Right Video Scan + Settings Buttons */}
+        <div className="flex items-center space-x-1.5">
+          <button
+            onClick={onOpenVideoScanner}
+            title="Scan & Download Webpage Videos (1-Click)"
+            className="relative w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-orange-600/30 border border-white/15 hover:border-orange-500/50 text-white/85 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+          >
+            <Film className="w-4 h-4 stroke-[1.75]" />
+            {detectedVideoCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-gradient-to-r from-orange-600 to-amber-500 text-[9px] font-bold text-white flex items-center justify-center shadow">
+                {detectedVideoCount > 9 ? '9+' : detectedVideoCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={onOpenSettings}
+            title="Settings & API Key"
+            className="w-8 h-8 rounded-full flex items-center justify-center bg-black/40 hover:bg-black/60 border border-white/15 text-white/80 hover:text-white backdrop-blur-md transition-all cursor-pointer active:scale-95"
+          >
+            <Settings className="w-4 h-4 stroke-[1.75]" />
+          </button>
+        </div>
       </header>
     );
   }
@@ -76,6 +95,20 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Circular Frosted Buttons */}
       <div className="flex items-center space-x-2">
+        {/* 1-Click Video Scanner Button */}
+        <button
+          onClick={onOpenVideoScanner}
+          title="Scan & Download Webpage Videos (1-Click)"
+          className="relative w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-orange-500/25 border border-white/15 hover:border-orange-400/50 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-sm active:scale-95"
+        >
+          <Film className="w-4 h-4 stroke-[1.75]" />
+          {detectedVideoCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-gradient-to-r from-orange-600 to-amber-500 text-[9px] font-bold text-white flex items-center justify-center shadow">
+              {detectedVideoCount > 9 ? '9+' : detectedVideoCount}
+            </span>
+          )}
+        </button>
+
         {/* User Website button (next to Settings) */}
         <button
           onClick={handleOpenWebsite}

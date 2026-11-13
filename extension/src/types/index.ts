@@ -9,6 +9,7 @@ export type BrowserActionType =
   | 'READ_CURRENT_PAGE'
   | 'SUMMARIZE_PAGE'
   | 'FILL_FORM'
+  | 'SCAN_VIDEOS'
   | 'WAIT_FOR_PAGE'
   | 'ASK_USER'
   | 'REPORT_RESULT';
@@ -122,4 +123,104 @@ export interface ActionResult {
   success: boolean;
   message: string;
   data?: unknown;
+}
+
+// ============================================================================
+// Video Scanner & Downloader Types (Z-Pilot v2)
+// ============================================================================
+
+export type VideoFormatKind =
+  | 'mp4'
+  | 'webm'
+  | 'mov'
+  | 'hls'
+  | 'dash'
+  | 'audio'
+  | 'unknown';
+
+export type VideoStreamKind = 'muxed' | 'video-only' | 'audio-only' | 'stream';
+
+export type VideoDetectionSource = 'dom' | 'network' | 'youtube' | 'hls-variant' | 'meta';
+
+export interface DetectedVideo {
+  id: string;
+  url: string;
+  /** Cleaned URL used for deduplication */
+  canonicalUrl: string;
+  title: string;
+  format: VideoFormatKind;
+  streamKind: VideoStreamKind;
+  source: VideoDetectionSource;
+  mimeType?: string;
+  quality?: string;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+  sizeBytes?: number;
+  thumbnailUrl?: string;
+  filename: string;
+  /** Optional note if protected / audio-only / DASH */
+  note?: string;
+  /** Priority score computed during ranking */
+  score: number;
+  /** Timestamp discovered */
+  detectedAt: number;
+}
+
+export interface SniffedMediaEntry {
+  url: string;
+  canonicalUrl: string;
+  tabId: number;
+  format: VideoFormatKind;
+  streamKind: VideoStreamKind;
+  mimeType?: string;
+  quality?: string;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+  sizeBytes?: number;
+  titleHint?: string;
+  itag?: number;
+  detectedAt: number;
+}
+
+export interface VideoScanResult {
+  tabId: number;
+  pageUrl: string;
+  pageTitle: string;
+  videos: DetectedVideo[];
+  scannedAt: number;
+  scanDurationMs: number;
+  sourcesChecked: {
+    domFrames: number;
+    networkEntries: number;
+    youtubeExtracted: boolean;
+    hlsVariantsExpanded: number;
+  };
+  /** True when the scanned active tab is a YouTube watch/shorts/youtu.be page */
+  isYouTube?: boolean;
+  error?: string;
+}
+
+export type VideoDownloadStatus =
+  | 'idle'
+  | 'preparing'
+  | 'downloading'
+  | 'muxing'
+  | 'completed'
+  | 'cancelled'
+  | 'failed';
+
+export interface VideoDownloadProgress {
+  videoId: string;
+  status: VideoDownloadStatus;
+  /** 0 to 100, or -1 if indeterminate */
+  percent: number;
+  bytesDownloaded: number;
+  totalBytes?: number;
+  completedSegments?: number;
+  totalSegments?: number;
+  message?: string;
+  chromeDownloadId?: number;
+  mode?: 'video' | 'audio';
 }

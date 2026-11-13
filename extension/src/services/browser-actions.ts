@@ -3,6 +3,7 @@ import {
   PageContext,
   ActionResult,
 } from '../types/index.js';
+import { VideoScannerService } from './video-scanner.js';
 
 // Restricted protocols and domains where extensions cannot run content scripts
 const RESTRICTED_PATTERNS = [
@@ -335,6 +336,19 @@ export const BrowserActionService = {
             success: true,
             message: `Read page: "${ctx?.title || 'Current page'}"`,
             data: ctx,
+          };
+        }
+
+        case 'SCAN_VIDEOS': {
+          const scan = await VideoScannerService.scanActiveTab();
+          return {
+            actionId: action.id,
+            type: action.type,
+            success: !scan.error,
+            message: scan.error
+              ? scan.error
+              : `Found ${scan.videos.length} downloadable video/stream(s) in ${scan.scanDurationMs}ms`,
+            data: scan,
           };
         }
 

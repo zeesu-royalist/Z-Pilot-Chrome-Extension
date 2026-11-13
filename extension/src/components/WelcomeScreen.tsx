@@ -14,23 +14,31 @@ import {
   Globe,
   Youtube,
   Info,
+  Film,
+  Download,
 } from 'lucide-react';
 import { GeminiClient, sanitizeApiKey } from '../services/gemini-client.js';
 
 interface WelcomeScreenProps {
   onSelectPrompt: (prompt: string) => void;
   currentPageTitle?: string;
+  geminiModel?: string;
   isApiKeyConfigured?: boolean;
   onOpenSettings?: () => void;
   onSaveApiKey?: (apiKey: string) => void;
+  onOpenVideoScanner?: () => void;
+  detectedVideoCount?: number;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onSelectPrompt,
   currentPageTitle,
+  geminiModel = 'gemini-3.5-flash-lite',
   isApiKeyConfigured = false,
   onOpenSettings,
   onSaveApiKey,
+  onOpenVideoScanner,
+  detectedVideoCount = 0,
 }) => {
   const [inputKey, setInputKey] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -258,6 +266,37 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </div>
         )}
 
+        {/* 1-Click Video Scanner & Downloader Hero Action */}
+        {onOpenVideoScanner && (
+          <button
+            type="button"
+            onClick={onOpenVideoScanner}
+            className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-orange-600/30 via-amber-500/20 to-black/60 hover:from-orange-600/45 hover:via-amber-500/30 border border-orange-500/45 backdrop-blur-xl text-left transition-all group cursor-pointer shadow-xl shadow-orange-950/30 flex items-center justify-between active:scale-[0.99]"
+          >
+            <div className="flex items-center space-x-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-orange-600/40 shrink-0">
+                <Film className="w-4 h-4 stroke-[2.2]" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white flex items-center space-x-2">
+                  <span>Scan &amp; Download Page Videos</span>
+                  {detectedVideoCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-orange-500 text-[9px] font-mono text-white">
+                      {detectedVideoCount} ready
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-white/65 truncate">
+                  1-click analyze • 2nd-tap instant download
+                </div>
+              </div>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-orange-500/30 border border-white/15 flex items-center justify-center text-orange-300 group-hover:text-white transition-colors shrink-0 ml-2">
+              <Download className="w-4 h-4" />
+            </div>
+          </button>
+        )}
+
         {/* Suggestion Cards Row (Refined, Non-Vibe-Coded Icons) */}
         <div className="grid grid-cols-2 gap-2.5">
           {promptCards.map((card, idx) => {
@@ -319,7 +358,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               title="Change Gemini Model"
               className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-medium text-white/90 flex items-center space-x-1.5 transition-colors cursor-pointer"
             >
-              <span>Flash 2.5</span>
+              <span>
+                {geminiModel.includes('2.5')
+                  ? 'Flash 2.5'
+                  : geminiModel.includes('flash-lite')
+                  ? 'Flash 3.5 Lite'
+                  : 'Flash 3.5'}
+              </span>
               <span className="text-[10px] text-white/60">▾</span>
             </button>
           </div>

@@ -14,6 +14,7 @@ export const ALLOWED_ACTION_TYPES: readonly BrowserActionType[] = [
   'READ_CURRENT_PAGE',
   'SUMMARIZE_PAGE',
   'FILL_FORM',
+  'SCAN_VIDEOS',
   'WAIT_FOR_PAGE',
   'ASK_USER',
   'REPORT_RESULT',
