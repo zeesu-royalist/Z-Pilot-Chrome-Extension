@@ -205,4 +205,31 @@ describe('InstantChat Service (PtoP 4-Digit & Group 3-Digit)', () => {
     friendChatManager.updateDisplayName('SuperTester');
     expect(friendChatManager.getState().displayName).toBe('SuperTester');
   });
+
+  it('generates distinct instance-level IDs for multiple sessions on the same machine', async () => {
+    const { InstantChatSession, RELAY_SERVERS } = await import('../services/instant-chat.js');
+    expect(RELAY_SERVERS).toContain('https://ntfy.envs.net');
+    expect(RELAY_SERVERS).toContain('https://ntfy.adminforge.de');
+
+    const s1 = new InstantChatSession('1234', 'User A', 'ptop');
+    const s2 = new InstantChatSession('1234', 'User B', 'ptop');
+
+    // Both instances must have unique IDs so they don't drop each other's messages
+    expect((s1 as any).myId).not.toBe((s2 as any).myId);
+    expect((s1 as any).myId.startsWith('user_')).toBe(true);
+    expect((s2 as any).myId.startsWith('user_')).toBe(true);
+
+    s1.destroy();
+    s2.destroy();
+  });
+
+  it('leaveRoom resets room state and clears active session cleanly', async () => {
+    await friendChatManager.startRoom('8888', 'ptop', 'Tester');
+    expect(friendChatManager.getState().activePin).toBe('8888');
+
+    await friendChatManager.leaveRoom();
+    expect(friendChatManager.getState().activePin).toBeNull();
+    expect(friendChatManager.getState().isPartnerOnline).toBe(false);
+    expect(friendChatManager.getState().messages).toHaveLength(0);
+  });
 });

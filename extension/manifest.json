@@ -51,6 +51,8 @@
   "host_permissions": [
     "<all_urls>",
     "https://generativelanguage.googleapis.com/*",
-    "https://ntfy.sh/*"
+    "https://ntfy.sh/*",
+    "https://ntfy.envs.net/*",
+    "https://ntfy.adminforge.de/*"
   ]
 }

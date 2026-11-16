@@ -457,7 +457,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
               {/* Join with 4-Digit PIN */}
               <form
                 onSubmit={handleJoinPtop}
-                className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3"
+                className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3 overflow-hidden"
               >
                 <div>
                   <p className="text-xs font-bold text-white/80">Enter Friend&apos;s 4-Digit PIN</p>
@@ -466,7 +466,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                   </p>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="grid grid-cols-2 gap-2.5 w-full">
                   <input
                     type="text"
                     value={ptopInputPin}
@@ -475,14 +475,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                     }
                     maxLength={4}
                     placeholder="• • • •"
-                    className="flex-1 bg-black/60 border border-white/15 focus:border-orange-500/60 rounded-xl px-4 py-2.5 text-center text-lg font-mono font-bold tracking-widest text-amber-300 placeholder:text-white/20 focus:outline-none transition-colors"
+                    className="w-full h-11 bg-black/60 border border-white/15 focus:border-orange-500/60 rounded-xl px-3 text-center text-lg font-mono font-bold tracking-widest text-amber-300 placeholder:text-white/20 focus:outline-none transition-colors"
                   />
                   <button
                     type="submit"
                     disabled={ptopInputPin.trim().length !== 4 && ptopInputPin.trim().length !== 3}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-500 text-white font-bold text-xs uppercase tracking-wider disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-md shadow-orange-600/25"
+                    className="w-full h-11 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-500 text-white font-bold text-xs uppercase tracking-wider disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-md shadow-orange-600/25 whitespace-nowrap"
                   >
-                    Join
+                    Join Chat
                   </button>
                 </div>
               </form>
@@ -516,7 +516,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
               {/* Join with 3-Digit Group PIN */}
               <form
                 onSubmit={handleJoinGroup}
-                className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3"
+                className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3 overflow-hidden"
               >
                 <div>
                   <p className="text-xs font-bold text-white/80">Enter Group 3-Digit PIN</p>
@@ -525,7 +525,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                   </p>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="grid grid-cols-2 gap-2.5 w-full">
                   <input
                     type="text"
                     value={groupInputPin}
@@ -534,12 +534,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                     }
                     maxLength={4}
                     placeholder="• • •"
-                    className="flex-1 bg-black/60 border border-white/15 focus:border-amber-500/60 rounded-xl px-4 py-2.5 text-center text-lg font-mono font-bold tracking-widest text-amber-300 placeholder:text-white/20 focus:outline-none transition-colors"
+                    className="w-full h-11 bg-black/60 border border-white/15 focus:border-amber-500/60 rounded-xl px-3 text-center text-lg font-mono font-bold tracking-widest text-amber-300 placeholder:text-white/20 focus:outline-none transition-colors"
                   />
                   <button
                     type="submit"
                     disabled={groupInputPin.trim().length !== 3 && groupInputPin.trim().length !== 4}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-500 text-white font-bold text-xs uppercase tracking-wider disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-md shadow-amber-600/25"
+                    className="w-full h-11 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-500 text-white font-bold text-xs uppercase tracking-wider disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer active:scale-95 shadow-md shadow-amber-600/25 whitespace-nowrap"
                   >
                     Join Group
                   </button>
@@ -895,7 +895,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
               onChange={(e) => setInputText(e.target.value)}
               maxLength={2000}
               placeholder={isGroup ? 'Message group & hit Enter...' : 'Message friend & hit Enter...'}
-              className="flex-1 bg-white/5 border border-white/15 focus:border-orange-500/60 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-white/35 focus:outline-none transition-colors select-text font-sans"
+              className="flex-1 min-w-0 bg-white/5 border border-white/15 focus:border-orange-500/60 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-white/35 focus:outline-none transition-colors select-text font-sans"
             />
             <button
               type="submit"

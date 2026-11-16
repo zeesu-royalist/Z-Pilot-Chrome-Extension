@@ -35,7 +35,13 @@ interface SignalPayload {
   roomPin?: string;
 }
 
-const NTFY_BASE = 'https://ntfy.sh';
+// High-capacity, zero-signup public relays with multi-instance redundancy.
+// ntfy.envs.net & ntfy.adminforge.de provide 17,280 msgs/day quota each with full SSE streaming.
+export const RELAY_SERVERS = [
+  'https://ntfy.envs.net',
+  'https://ntfy.adminforge.de',
+  'https://ntfy.sh',
+];
 
 // Pleasant, subtle sound chime when message arrives (pure Web Audio API, 0 assets)
 export function playChatChime(): void {
@@ -217,8 +223,10 @@ export class InstantChatSession {
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private watchdogInterval: ReturnType<typeof setInterval> | null = null;
   private lastPartnerActivity = 0;
+  private lastOutgoingActivity = 0;
   private seenMessageIds: Set<string> = new Set();
   private participantsMap: Map<string, ParticipantInfo> = new Map();
+  private activeRelayIndex = 0;
 
   private onMessageCallback: ((msg: InstantChatMessage) => void) | null = null;
   private onMessageDeliveredCallback: ((msgId: string) => void) | null = null;
@@ -231,7 +239,8 @@ export class InstantChatSession {
     this.pin = pin.trim();
     this.mode = mode || (this.pin.length === 3 ? 'group' : 'ptop');
     this.topic = getTopicName(this.pin, this.mode);
-    this.myId = getSessionUserId();
+    // Base persistent user ID + randomized instance suffix so multiple windows/tabs on the SAME computer can chat!
+    this.myId = `${getSessionUserId()}_${Math.random().toString(36).slice(2, 7)}`;
     this.myName = myName.trim() || 'Friend';
   }
 
@@ -271,39 +280,101 @@ export class InstantChatSession {
       console.warn('[InstantChat] BroadcastChannel not supported:', err);
     }
 
-    // 2. Public SSE relay (EventSource) for cross-machine / Wi-Fi real-time streaming
+    // 2. High-capacity SSE relay for cross-machine / Wi-Fi real-time streaming
+    this.connectEventSource(0);
+
+    // Initial handshake retry: if no partner response after 1.5s, send one retry JOIN
+    setTimeout(() => {
+      if (!this.isDestroyed && this.lastPartnerActivity === 0) {
+        this.sendJoinHandshake();
+      }
+    }, 1500);
+
+    // Smart Heartbeat: Every 30s, ONLY if no outgoing activity in last 25s (prevents quota burn)
+    this.pingInterval = setInterval(() => {
+      if (this.isDestroyed) return;
+      const now = Date.now();
+      if (now - this.lastOutgoingActivity < 25000 && this.lastPartnerActivity > 0) {
+        return; // Presence already kept active by recent message
+      }
+      this.broadcastSignal({
+        type: 'PING',
+        senderId: this.myId,
+        senderName: this.myName,
+        timestamp: now,
+        mode: this.mode,
+        roomPin: this.pin,
+      });
+    }, 30000);
+
+    // Watchdog: 60s timeout for partner activity
+    this.watchdogInterval = setInterval(() => {
+      if (this.isDestroyed) return;
+      const now = Date.now();
+
+      // Check PtoP partner activity (60s timeout)
+      if (this.lastPartnerActivity > 0 && now - this.lastPartnerActivity > 60000) {
+        this.onPartnerPresenceCallback?.('Friend', false);
+      }
+
+      // Check Group participants activity
+      let updatedParticipants = false;
+      this.participantsMap.forEach((info) => {
+        if (info.isOnline && now - info.lastSeen > 60000) {
+          info.isOnline = false;
+          updatedParticipants = true;
+        }
+      });
+      if (updatedParticipants) {
+        this.emitParticipants();
+      }
+    }, 5000);
+  }
+
+  private sendJoinHandshake(): void {
+    if (this.isDestroyed) return;
+    this.broadcastSignal({
+      type: 'JOIN',
+      senderId: this.myId,
+      senderName: this.myName,
+      timestamp: Date.now(),
+      mode: this.mode,
+      roomPin: this.pin,
+    });
+  }
+
+  private connectEventSource(serverIndex = 0): void {
+    if (this.isDestroyed || typeof EventSource === 'undefined') return;
+    this.activeRelayIndex = serverIndex % RELAY_SERVERS.length;
+    const currentServer = RELAY_SERVERS[this.activeRelayIndex];
+    const sseUrl = `${currentServer}/${this.topic}/sse`;
+
     try {
-      const sseUrl = `${NTFY_BASE}/${this.topic}/sse`;
+      if (this.eventSource) {
+        try {
+          this.eventSource.close();
+        } catch {
+          // Ignore
+        }
+        this.eventSource = null;
+      }
+
       this.eventSource = new EventSource(sseUrl);
 
-      // Trigger presence as soon as socket connects
       this.eventSource.onopen = () => {
-        this.broadcastSignal({
-          type: 'JOIN',
-          senderId: this.myId,
-          senderName: this.myName,
-          timestamp: Date.now(),
-          mode: this.mode,
-          roomPin: this.pin,
-        });
+        this.sendJoinHandshake();
       };
 
-      // ntfy.sh SSE delivers: event: message\ndata: {id,event,message,...}
-      // The .message field inside data contains our JSON-stringified payload.
-      // EventSource.onmessage fires for all events including "message" type (which ntfy uses).
       this.eventSource.onmessage = (event) => {
         try {
           if (!event.data || event.data === '') return;
           const raw = JSON.parse(event.data);
-          // Skip keepalive "open" events
           if (!raw || raw.event === 'open' || !raw.message) return;
 
-          // raw.message is a JSON-stringified SignalPayload string
           let payload: SignalPayload;
           if (typeof raw.message === 'string') {
             payload = JSON.parse(raw.message);
           } else if (typeof raw.message === 'object') {
-            // Defensive: some relay versions might pre-parse it
             payload = raw.message as SignalPayload;
           } else {
             return;
@@ -313,69 +384,33 @@ export class InstantChatSession {
             this.handleIncomingPayload(payload);
           }
         } catch {
-          // Ignore non-chat / malformed packets
+          // Ignore malformed packets
         }
       };
 
       this.eventSource.onerror = () => {
-        // SSE auto-reconnects on transient disconnects — no action needed
+        if (this.eventSource && this.eventSource.readyState === EventSource.CLOSED) {
+          try {
+            this.eventSource.close();
+          } catch {
+            // Ignore
+          }
+          this.eventSource = null;
+          if (!this.isDestroyed) {
+            setTimeout(() => {
+              if (!this.isDestroyed && !this.eventSource) {
+                this.connectEventSource(serverIndex + 1);
+              }
+            }, 2000);
+          }
+        }
       };
     } catch (err) {
-      console.warn('[InstantChat] SSE connection failed:', err);
+      console.warn('[InstantChat] SSE connect error on', sseUrl, err);
+      if (!this.isDestroyed) {
+        setTimeout(() => this.connectEventSource(serverIndex + 1), 2000);
+      }
     }
-
-    // Fast initial handshakes
-    const sendJoin = () => {
-      if (!this.isDestroyed) {
-        this.broadcastSignal({
-          type: 'JOIN',
-          senderId: this.myId,
-          senderName: this.myName,
-          timestamp: Date.now(),
-          mode: this.mode,
-          roomPin: this.pin,
-        });
-      }
-    };
-    setTimeout(sendJoin, 300);
-    setTimeout(sendJoin, 1200);
-
-    // Regular Heartbeat every 10 seconds (safe under ntfy rate limits)
-    this.pingInterval = setInterval(() => {
-      if (!this.isDestroyed) {
-        this.broadcastSignal({
-          type: 'PING',
-          senderId: this.myId,
-          senderName: this.myName,
-          timestamp: Date.now(),
-          mode: this.mode,
-          roomPin: this.pin,
-        });
-      }
-    }, 10000);
-
-    // Watchdog: Participant & Partner Presence checks (30s timeout)
-    this.watchdogInterval = setInterval(() => {
-      if (this.isDestroyed) return;
-      const now = Date.now();
-
-      // Check PtoP partner activity
-      if (this.lastPartnerActivity > 0 && now - this.lastPartnerActivity > 30000) {
-        this.onPartnerPresenceCallback?.('Friend', false);
-      }
-
-      // Check Group participants activity
-      let updatedParticipants = false;
-      this.participantsMap.forEach((info) => {
-        if (info.isOnline && now - info.lastSeen > 30000) {
-          info.isOnline = false;
-          updatedParticipants = true;
-        }
-      });
-      if (updatedParticipants) {
-        this.emitParticipants();
-      }
-    }, 4000);
   }
 
   /**
@@ -448,7 +483,25 @@ export class InstantChatSession {
     if (this.isDestroyed) return;
     this.isDestroyed = true;
 
-    // Send departure notice to peers
+    // Send departure notice to local windows immediately before closing channel
+    if (this.broadcastChannel) {
+      try {
+        this.broadcastChannel.postMessage({
+          type: 'LEAVE',
+          senderId: this.myId,
+          senderName: this.myName,
+          timestamp: Date.now(),
+          mode: this.mode,
+          roomPin: this.pin,
+        });
+        this.broadcastChannel.close();
+      } catch {
+        // Ignore
+      }
+      this.broadcastChannel = null;
+    }
+
+    // Send departure notice to peers over network
     this.broadcastSignal({
       type: 'LEAVE',
       senderId: this.myId,
@@ -466,15 +519,6 @@ export class InstantChatSession {
     if (this.watchdogInterval) {
       clearInterval(this.watchdogInterval);
       this.watchdogInterval = null;
-    }
-
-    if (this.broadcastChannel) {
-      try {
-        this.broadcastChannel.close();
-      } catch {
-        // Ignore
-      }
-      this.broadcastChannel = null;
     }
 
     if (this.eventSource) {
@@ -623,14 +667,13 @@ export class InstantChatSession {
   }
 
   /**
-   * Broadcast signal payload to both local BroadcastChannel and remote ntfy stream.
-   * Returns true if remote post succeeded, false on network failure.
+   * Broadcast signal payload to both local BroadcastChannel and remote relay pool.
+   * Features automatic relay server failover.
    */
   private async broadcastSignal(payload: SignalPayload): Promise<void> {
-    // Guard: don't send after session is destroyed
-    if (this.isDestroyed && payload.type !== 'LEAVE') return;
+    this.lastOutgoingActivity = Date.now();
 
-    // 1. Same-device local BroadcastChannel (instant, zero latency)
+    // 1. Same-device local BroadcastChannel (instant, zero latency between windows)
     if (this.broadcastChannel) {
       try {
         this.broadcastChannel.postMessage(payload);
@@ -639,21 +682,43 @@ export class InstantChatSession {
       }
     }
 
-    // 2. Wi-Fi / Remote cross-machine relay via ntfy.sh (X-Cache: no = never cache)
-    try {
-      const body = JSON.stringify(payload);
-      await fetch(`${NTFY_BASE}/${this.topic}`, {
-        method: 'POST',
-        headers: {
-          'Title': 'Z-Pilot Chat',
-          'X-Cache': 'no', // NEVER cache on server — pure live relay!
-          'X-Priority': 'urgent',
-          'Content-Type': 'text/plain', // ntfy treats body as message string
-        },
-        body,
-      });
-    } catch {
-      // Ignore network errors — offline mode degrades gracefully to BroadcastChannel only
+    // Guard: don't send over network after session is destroyed unless sending departure notice
+    if (this.isDestroyed && payload.type !== 'LEAVE') return;
+
+    // 2. Wi-Fi / Remote cross-machine relay via public high-capacity ntfy pool.
+    // Broadcast concurrently to top 2 high-capacity relays (17,280 msgs/day each)
+    // so peers connected to either relay receive messages with 0 sync delay.
+    const body = JSON.stringify(payload);
+    const postToRelay = async (relayBase: string): Promise<boolean> => {
+      try {
+        const resp = await fetch(`${relayBase}/${this.topic}`, {
+          method: 'POST',
+          headers: {
+            'Title': 'Z-Pilot Chat',
+            'X-Cache': 'no', // NEVER cache on server — pure live relay!
+            'X-Priority': 'urgent',
+            'Content-Type': 'text/plain',
+          },
+          body,
+        });
+        return resp.ok;
+      } catch {
+        return false;
+      }
+    };
+
+    const results = await Promise.allSettled([
+      postToRelay(RELAY_SERVERS[0]),
+      postToRelay(RELAY_SERVERS[1]),
+    ]);
+
+    const anySuccess = results.some(
+      (r) => r.status === 'fulfilled' && r.value === true
+    );
+
+    // If both high-capacity servers were unreachable, fallback to tertiary relay
+    if (!anySuccess && RELAY_SERVERS.length > 2) {
+      await postToRelay(RELAY_SERVERS[2]);
     }
   }
 }
