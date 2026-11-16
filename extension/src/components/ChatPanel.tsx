@@ -14,7 +14,6 @@ import {
   Flame,
   Trash2,
   AlertTriangle,
-  Sparkles,
   MessageSquare,
   Clock,
   Edit2,
@@ -116,6 +115,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
       setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [chatState.activePin]);
+
+  // Close confirmation modals or popups on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showDeleteConfirm) setShowDeleteConfirm(false);
+        if (showWipeAllConfirm) setShowWipeAllConfirm(false);
+        if (showParticipantsList) setShowParticipantsList(false);
+        if (isEditingNameInRoom) setIsEditingNameInRoom(false);
+      }
+    };
+    if (showDeleteConfirm || showWipeAllConfirm || showParticipantsList || isEditingNameInRoom) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [showDeleteConfirm, showWipeAllConfirm, showParticipantsList, isEditingNameInRoom]);
 
   // 1-Click Generate PIN & Start Room
   const handleGenerateAndStart = (mode: ChatMode) => {
@@ -239,16 +254,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
   // Confirm Delete Current Room Chats
   const handleConfirmDelete = async () => {
-    await friendChatManager.deleteCurrentChatMessages();
     setShowDeleteConfirm(false);
-    loadSavedRooms();
+    try {
+      await friendChatManager.deleteCurrentChatMessages();
+      loadSavedRooms();
+    } catch (err) {
+      console.error('[ChatPanel] Error deleting room chats:', err);
+    }
   };
 
   // Confirm Wipe All Chats Across All Rooms
   const handleConfirmWipeAll = async () => {
-    await friendChatManager.deleteAllChats();
     setShowWipeAllConfirm(false);
-    loadSavedRooms();
+    try {
+      await friendChatManager.deleteAllChats();
+      loadSavedRooms();
+    } catch (err) {
+      console.error('[ChatPanel] Error wiping all chats:', err);
+    }
   };
 
   // Palette generator for sender names in group chat
@@ -357,64 +380,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#140803] border border-orange-500/40 rounded-2xl p-4 max-w-xs w-full shadow-2xl space-y-3 animate-fade-in">
-            <div className="flex items-center space-x-2.5 text-amber-400">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              <h4 className="text-xs font-bold text-white">Delete Room Messages?</h4>
-            </div>
-            <p className="text-[11px] text-white/70 leading-relaxed">
-              This will permanently delete all saved chat messages for Room #{activePin} from this browser.
-            </p>
-            <div className="flex items-center justify-end space-x-2 pt-1">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white/80 font-medium transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-xs text-white font-bold transition-all shadow-md shadow-red-950 cursor-pointer active:scale-95"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Wipe All Chats Confirmation Modal */}
-      {showWipeAllConfirm && (
-        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#140803] border border-red-500/50 rounded-2xl p-4 max-w-xs w-full shadow-2xl space-y-3 animate-fade-in">
-            <div className="flex items-center space-x-2.5 text-red-400">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              <h4 className="text-xs font-bold text-white">Wipe All Saved Chats?</h4>
-            </div>
-            <p className="text-[11px] text-white/70 leading-relaxed">
-              This will permanently delete all chat history across ALL saved rooms from this browser storage.
-            </p>
-            <div className="flex items-center justify-end space-x-2 pt-1">
-              <button
-                onClick={() => setShowWipeAllConfirm(false)}
-                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white/80 font-medium transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmWipeAll}
-                className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-xs text-white font-bold transition-all shadow-md shadow-red-950 cursor-pointer active:scale-95"
-              >
-                Wipe All
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── MAIN CONTENT AREA ── */}
       {!activePin ? (
         /* ════════ SETUP / LOBBY VIEW ════════ */
@@ -439,25 +404,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
             <button
               type="button"
               onClick={() => setSelectedLobbyMode('ptop')}
-              className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+              className={`flex-1 py-2 rounded-xl font-semibold text-[11px] flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
                 selectedLobbyMode === 'ptop'
                   ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md shadow-orange-600/30'
                   : 'text-white/60 hover:text-white'
               }`}
             >
-              <User className="w-3.5 h-3.5" />
+              <User className="w-3 h-3" />
               <span>Person to Person (4-Digit)</span>
             </button>
             <button
               type="button"
               onClick={() => setSelectedLobbyMode('group')}
-              className={`flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+              className={`flex-1 py-2 rounded-xl font-semibold text-[11px] flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
                 selectedLobbyMode === 'group'
                   ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md shadow-amber-600/30'
                   : 'text-white/60 hover:text-white'
               }`}
             >
-              <Users className="w-3.5 h-3.5" />
+              <Users className="w-3 h-3" />
               <span>Group Chat (3-Digit)</span>
             </button>
           </div>
@@ -724,31 +689,37 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
 
               {/* Group participants dropdown */}
               {isGroup && showParticipantsList && (
-                <div className="absolute right-0 top-full mt-1.5 z-50 w-48 rounded-xl bg-[#140803] border border-orange-500/30 shadow-xl p-2 space-y-1.5 animate-fade-in text-xs">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-orange-400 px-1">
-                    Room Members
-                  </p>
-                  <div className="flex items-center space-x-1.5 px-1 py-0.5 text-white/90">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span>{displayName} (You)</span>
-                  </div>
-                  {participants.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center space-x-1.5 px-1 py-0.5 text-white/70"
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          p.isOnline ? 'bg-amber-400' : 'bg-white/20'
-                        }`}
-                      />
-                      <span>{p.name}</span>
-                      {!p.isOnline && (
-                        <span className="text-[9px] text-white/30 ml-auto">offline</span>
-                      )}
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowParticipantsList(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1.5 z-50 w-48 rounded-xl bg-[#140803] border border-orange-500/30 shadow-xl p-2 space-y-1.5 animate-fade-in text-xs">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-orange-400 px-1">
+                      Room Members
+                    </p>
+                    <div className="flex items-center space-x-1.5 px-1 py-0.5 text-white/90">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span>{displayName} (You)</span>
                     </div>
-                  ))}
-                </div>
+                    {participants.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center space-x-1.5 px-1 py-0.5 text-white/70"
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            p.isOnline ? 'bg-amber-400' : 'bg-white/20'
+                          }`}
+                        />
+                        <span>{p.name}</span>
+                        {!p.isOnline && (
+                          <span className="text-[9px] text-white/30 ml-auto">offline</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -761,6 +732,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                   type="text"
                   value={inRoomNameInput}
                   onChange={(e) => setInRoomNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveInRoomName();
+                    if (e.key === 'Escape') setIsEditingNameInRoom(false);
+                  }}
                   maxLength={24}
                   placeholder="New display name..."
                   className="flex-1 bg-white/10 border border-orange-500/40 rounded px-2 py-0.5 text-[11px] text-white focus:outline-none"
@@ -833,7 +808,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
                     onClick={() => handleSendIcebreaker("👋 Hey! I'm on Z-Pilot.")}
                     className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-orange-500/20 border border-white/10 hover:border-orange-500/30 text-[10px] text-white/70 hover:text-orange-200 transition-colors cursor-pointer flex items-center space-x-1"
                   >
-                    <Sparkles className="w-2.5 h-2.5 text-orange-400" />
                     <span>Say Hello 👋</span>
                   </button>
                   <button
@@ -931,6 +905,80 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
               <Send className={`w-4 h-4 stroke-[2.2] ${isSending ? 'opacity-50' : ''}`} />
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div
+          onClick={() => setShowDeleteConfirm(false)}
+          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#160803] border border-orange-500/50 rounded-2xl p-4 max-w-xs w-full shadow-2xl space-y-3 animate-fade-in"
+          >
+            <div className="flex items-center space-x-2.5 text-amber-400">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <h4 className="text-xs font-bold text-white">Delete Room Messages?</h4>
+            </div>
+            <p className="text-[11px] text-white/70 leading-relaxed">
+              This will permanently delete all saved chat messages for Room #{activePin} from this browser.
+            </p>
+            <div className="flex items-center justify-end space-x-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white/80 font-medium transition-colors cursor-pointer active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-xs text-white font-bold transition-all shadow-md shadow-red-950 cursor-pointer active:scale-95"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wipe All Chats Confirmation Modal */}
+      {showWipeAllConfirm && (
+        <div
+          onClick={() => setShowWipeAllConfirm(false)}
+          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#160803] border border-red-500/50 rounded-2xl p-4 max-w-xs w-full shadow-2xl space-y-3 animate-fade-in"
+          >
+            <div className="flex items-center space-x-2.5 text-red-400">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <h4 className="text-xs font-bold text-white">Wipe All Saved Chats?</h4>
+            </div>
+            <p className="text-[11px] text-white/70 leading-relaxed">
+              This will permanently delete all chat history across ALL saved rooms from this browser storage.
+            </p>
+            <div className="flex items-center justify-end space-x-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowWipeAllConfirm(false)}
+                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white/80 font-medium transition-colors cursor-pointer active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmWipeAll}
+                className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-xs text-white font-bold transition-all shadow-md shadow-red-950 cursor-pointer active:scale-95"
+              >
+                Wipe All
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
