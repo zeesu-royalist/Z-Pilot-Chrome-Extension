@@ -11,13 +11,13 @@
   </p>
 
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.0.0.zip">
-      <img src="https://img.shields.io/badge/⬇️_FREE_DOWNLOAD-Z--Pilot_v2.0_(ZIP)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Download Z-Pilot ZIP" />
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.0.2.zip">
+      <img src="https://img.shields.io/badge/⬇️_FREE_DOWNLOAD-Z--Pilot_v2.0.2_(ZIP)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Download Z-Pilot ZIP" />
     </a>
   </p>
 
   <p align="center">
-    <img src="https://img.shields.io/badge/Version-2.0.0-f97316?style=flat-square&logo=git&logoColor=white" alt="Version 2.0.0" />
+    <img src="https://img.shields.io/badge/Version-2.0.2-f97316?style=flat-square&logo=git&logoColor=white" alt="Version 2.0.2" />
     <img src="https://img.shields.io/badge/Engine-Google_Gemini-4285F4?style=flat-square&logo=google&logoColor=white" alt="Google Gemini" />
     <img src="https://img.shields.io/badge/Cost-100%25_FREE-10b981?style=flat-square&logo=cashapp&logoColor=white" alt="100% Free" />
     <img src="https://img.shields.io/badge/Privacy-100%25_Local_BYOK-8b5cf6?style=flat-square&logo=shield&logoColor=white" alt="Client Side Privacy" />
@@ -86,7 +86,7 @@ Instead of opening 10 different tabs or slowing down your computer with 8 separa
       Translate foreign articles, research papers, and websites directly in your side panel with 1-click language swap.
     </td>
     <td width="50%">
-      <h3>📋 ClipBot (Smart Clipboard)</h3>
+      <h3>📋 Clipboard (Smart Clipboard)</h3>
       Auto-saves your copied text history. Never lose an important address, snippet, or link you copied 10 minutes ago.
     </td>
   </tr>
@@ -122,8 +122,8 @@ No coding or terminal knowledge required. Follow these 3 simple steps:
 Download the latest bundle and unzip it on your computer:
 
 <p>
-  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.0.0.zip">
-    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.0.0.zip-ea580c?style=flat-square&logo=googlechrome&logoColor=white" height="34" alt="Download ZIP" />
+  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.0.2.zip">
+    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.0.2.zip-ea580c?style=flat-square&logo=googlechrome&logoColor=white" height="34" alt="Download ZIP" />
   </a>
 </p>
 
@@ -198,7 +198,7 @@ Google Chrome, Brave, Microsoft Edge, Opera, Vivaldi, and any Chromium-based bro
   ### 🌟 Ready to upgrade your browser?
 
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.0.0.zip">
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.0.2.zip">
       <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-FREE_DOWNLOAD-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started" />
     </a>
   </p>
