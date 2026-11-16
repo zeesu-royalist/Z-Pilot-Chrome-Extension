@@ -467,7 +467,7 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
   });
 
   // --------------------------------------------------------------------------
-  // ClipBot: Automatic Browser Clipboard Capture (Max 10 clips)
+  // Clipboard: Automatic Browser Clipboard Capture (Max 10 clips)
   // --------------------------------------------------------------------------
   let captureDebounce: ReturnType<typeof setTimeout> | null = null;
 
@@ -490,7 +490,7 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     }
   }
 
-  function dispatchClipbotText(rawText: string): void {
+  function dispatchClipboardText(rawText: string): void {
     if (!isContextValid()) {
       detachCopyListeners();
       return;
@@ -500,14 +500,14 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     if (!text) return;
 
     // Direct local storage write for 100% reliability
-    StorageService.addClipbotItem(text, window.location.href, document.title).catch(() => { });
+    StorageService.addClipboardItem(text, window.location.href, document.title).catch(() => { });
 
     // Also send runtime message to notify active extension views
     try {
       if (chrome.runtime?.sendMessage) {
         chrome.runtime
           .sendMessage({
-            type: 'CLIPBOT_COPY',
+            type: 'Clipboard_COPY',
             text,
             sourceUrl: window.location.href,
             sourceTitle: document.title,
@@ -555,7 +555,7 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     // 1. Immediate synchronous check from DOM selection
     const immediateText = getSelectedTextFromDOM();
     if (immediateText) {
-      dispatchClipbotText(immediateText);
+      dispatchClipboardText(immediateText);
     }
 
     // 2. Fallback check with short delay for clipboard APIs / custom page scripts
@@ -567,13 +567,13 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       }
       const delayedText = getSelectedTextFromDOM();
       if (delayedText) {
-        dispatchClipbotText(delayedText);
+        dispatchClipboardText(delayedText);
       } else if (navigator.clipboard?.readText) {
         navigator.clipboard
           .readText()
           .then((clip) => {
             if (clip && clip.trim()) {
-              dispatchClipbotText(clip.trim());
+              dispatchClipboardText(clip.trim());
             }
           })
           .catch(() => {

@@ -1,4 +1,4 @@
-import { CalculationRecord, ChatMessage, ClipItem, QuickNote, SavedTranslation, TodoItem, TodoPriority, UserProfile, UserSettings } from '../types/index.js';
+import { CalculationRecord, ChatMessage, ClipItem, FriendChatMessage, FriendChatSessionState, QuickNote, SavedTranslation, TodoItem, TodoPriority, UserProfile, UserSettings } from '../types/index.js';
 
 const STORAGE_KEYS = {
   MESSAGES: 'zpilot_messages',
@@ -8,7 +8,10 @@ const STORAGE_KEYS = {
   TRANSLATIONS: 'zpilot_translations',
   TODOS: 'zpilot_todos',
   CALC_HISTORY: 'zpilot_calc_history',
-  CLIPBOT: 'zpilot_clipbot_items',
+  Clipboard: 'zpilot_Clipboard_items',
+  FRIEND_CHAT_SESSION: 'zpilot_friend_chat_session',
+  FRIEND_CHAT_ROOMS_PREFIX: 'zpilot_friend_chat_room_',
+  FRIEND_CHAT_ROOMS_LIST: 'zpilot_friend_chat_room_list',
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -493,51 +496,51 @@ export const StorageService = {
   },
 
   // --------------------------------------------------------------------------
-  // ClipBot (Automatic Clipboard Capture - Max 10 items)
+  // Clipboard (Automatic Clipboard Capture - Max 10 items)
   // --------------------------------------------------------------------------
 
-  async getClipbotItems(): Promise<ClipItem[]> {
+  async getClipboardItems(): Promise<ClipItem[]> {
     try {
       if (isExtensionEnvironment()) {
-        const result = await chrome.storage.local.get(STORAGE_KEYS.CLIPBOT);
-        const data = result[STORAGE_KEYS.CLIPBOT];
+        const result = await chrome.storage.local.get(STORAGE_KEYS.Clipboard);
+        const data = result[STORAGE_KEYS.Clipboard];
         return Array.isArray(data) ? data.slice(0, 10) : [];
       } else {
-        const raw = localStorage.getItem(STORAGE_KEYS.CLIPBOT);
+        const raw = localStorage.getItem(STORAGE_KEYS.Clipboard);
         return raw ? (JSON.parse(raw) as ClipItem[]).slice(0, 10) : [];
       }
     } catch (err) {
-      logStorageWarn('Failed to get ClipBot items', err);
+      logStorageWarn('Failed to get Clipboard items', err);
       return [];
     }
   },
 
-  async saveClipbotItems(items: ClipItem[]): Promise<void> {
+  async saveClipboardItems(items: ClipItem[]): Promise<void> {
     const capped = items.slice(0, 10);
     try {
       if (isExtensionEnvironment()) {
-        await chrome.storage.local.set({ [STORAGE_KEYS.CLIPBOT]: capped });
+        await chrome.storage.local.set({ [STORAGE_KEYS.Clipboard]: capped });
       } else {
-        localStorage.setItem(STORAGE_KEYS.CLIPBOT, JSON.stringify(capped));
+        localStorage.setItem(STORAGE_KEYS.Clipboard, JSON.stringify(capped));
       }
     } catch (err) {
-      logStorageError('Failed to save ClipBot items', err);
+      logStorageError('Failed to save Clipboard items', err);
     }
   },
 
-  async addClipbotItem(
+  async addClipboardItem(
     text: string,
     sourceUrl?: string,
     sourceTitle?: string
   ): Promise<ClipItem[]> {
     const trimmed = text.trim();
     if (!trimmed) {
-      return this.getClipbotItems();
+      return this.getClipboardItems();
     }
 
     // Limit single clip length to 50,000 characters
     const cleanText = trimmed.length > 50000 ? trimmed.slice(0, 50000) : trimmed;
-    const existing = await this.getClipbotItems();
+    const existing = await this.getClipboardItems();
 
     // Check if item with identical text already exists (MRU deduplication)
     const existingIndex = existing.findIndex((item) => item.text === cleanText);
@@ -561,33 +564,235 @@ export const StorageService = {
 
     // Newest first, capped strictly at 10 items
     const updated = [newItem, ...filtered].slice(0, 10);
-    await this.saveClipbotItems(updated);
+    await this.saveClipboardItems(updated);
     return updated;
   },
 
-  async deleteClipbotItem(id: string): Promise<ClipItem[]> {
-    const existing = await this.getClipbotItems();
+  async deleteClipboardItem(id: string): Promise<ClipItem[]> {
+    const existing = await this.getClipboardItems();
     const updated = existing.filter((item) => item.id !== id);
-    await this.saveClipbotItems(updated);
+    await this.saveClipboardItems(updated);
     return updated;
   },
 
-  async togglePinClipbotItem(id: string): Promise<ClipItem[]> {
-    const existing = await this.getClipbotItems();
+  async togglePinClipboardItem(id: string): Promise<ClipItem[]> {
+    const existing = await this.getClipboardItems();
     const updated = existing.map((item) =>
       item.id === id ? { ...item, pinned: !item.pinned } : item
     );
-    await this.saveClipbotItems(updated);
+    await this.saveClipboardItems(updated);
     return updated;
   },
 
-  async clearClipbotItems(preservePinned = false): Promise<void> {
+  async clearClipboardItems(preservePinned = false): Promise<void> {
     if (preservePinned) {
-      const existing = await this.getClipbotItems();
+      const existing = await this.getClipboardItems();
       const pinnedOnly = existing.filter((item) => item.pinned);
-      await this.saveClipbotItems(pinnedOnly);
+      await this.saveClipboardItems(pinnedOnly);
     } else {
-      await this.saveClipbotItems([]);
+      await this.saveClipboardItems([]);
+    }
+  },
+
+  // Backwards-compatible aliases for Clipbot
+  async getClipbotItems(): Promise<ClipItem[]> {
+    return this.getClipboardItems();
+  },
+
+  async saveClipbotItems(items: ClipItem[]): Promise<void> {
+    return this.saveClipboardItems(items);
+  },
+
+  async addClipbotItem(text: string, sourceUrl?: string, sourceTitle?: string): Promise<ClipItem[]> {
+    return this.addClipboardItem(text, sourceUrl, sourceTitle);
+  },
+
+  async deleteClipbotItem(id: string): Promise<ClipItem[]> {
+    return this.deleteClipboardItem(id);
+  },
+
+  async togglePinClipbotItem(id: string): Promise<ClipItem[]> {
+    return this.togglePinClipboardItem(id);
+  },
+
+  async clearClipbotItems(preservePinned = false): Promise<void> {
+    return this.clearClipboardItems(preservePinned);
+  },
+
+  // ============================================================================
+  // Friend Chat (PtoP 4-Digit & Group 3-Digit) Persistent Storage
+  // ============================================================================
+
+  async getFriendChatSession(): Promise<FriendChatSessionState | null> {
+    try {
+      if (isExtensionEnvironment()) {
+        const result = await chrome.storage.local.get(STORAGE_KEYS.FRIEND_CHAT_SESSION);
+        return result[STORAGE_KEYS.FRIEND_CHAT_SESSION] || null;
+      } else {
+        const item = localStorage.getItem(STORAGE_KEYS.FRIEND_CHAT_SESSION);
+        return item ? JSON.parse(item) : null;
+      }
+    } catch (err) {
+      logStorageWarn('Error getting friend chat session', err);
+      return null;
+    }
+  },
+
+  async saveFriendChatSession(session: FriendChatSessionState | null): Promise<void> {
+    try {
+      if (isExtensionEnvironment()) {
+        if (session) {
+          await chrome.storage.local.set({ [STORAGE_KEYS.FRIEND_CHAT_SESSION]: session });
+        } else {
+          await chrome.storage.local.remove(STORAGE_KEYS.FRIEND_CHAT_SESSION);
+        }
+      } else {
+        if (session) {
+          localStorage.setItem(STORAGE_KEYS.FRIEND_CHAT_SESSION, JSON.stringify(session));
+        } else {
+          localStorage.removeItem(STORAGE_KEYS.FRIEND_CHAT_SESSION);
+        }
+      }
+    } catch (err) {
+      logStorageError('Failed to save friend chat session', err);
+    }
+  },
+
+  async getFriendChatMessages(pin: string): Promise<FriendChatMessage[]> {
+    const cleanPin = pin.trim();
+    if (!cleanPin) return [];
+    const key = `${STORAGE_KEYS.FRIEND_CHAT_ROOMS_PREFIX}${cleanPin}`;
+    try {
+      if (isExtensionEnvironment()) {
+        const result = await chrome.storage.local.get(key);
+        return Array.isArray(result[key]) ? result[key] : [];
+      } else {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : [];
+      }
+    } catch (err) {
+      logStorageWarn('Error getting friend chat messages for room ' + cleanPin, err);
+      return [];
+    }
+  },
+
+  async saveFriendChatMessages(pin: string, messages: FriendChatMessage[]): Promise<void> {
+    const cleanPin = pin.trim();
+    if (!cleanPin) return;
+    const key = `${STORAGE_KEYS.FRIEND_CHAT_ROOMS_PREFIX}${cleanPin}`;
+    // Keep reasonable history: up to latest 500 messages per room
+    const capped = messages.slice(-500);
+    try {
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.set({ [key]: capped });
+      } else {
+        localStorage.setItem(key, JSON.stringify(capped));
+      }
+      await this.recordRoomPinInList(cleanPin);
+    } catch (err) {
+      logStorageError('Failed to save friend chat messages for room ' + cleanPin, err);
+    }
+  },
+
+  async appendFriendChatMessage(pin: string, message: FriendChatMessage): Promise<FriendChatMessage[]> {
+    const existing = await this.getFriendChatMessages(pin);
+    if (existing.some((m) => m.id === message.id)) {
+      return existing;
+    }
+    const updated = [...existing, message];
+    await this.saveFriendChatMessages(pin, updated);
+    return updated;
+  },
+
+  async getSavedRoomsList(): Promise<string[]> {
+    try {
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST);
+        return Array.isArray(res[STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST])
+          ? res[STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST]
+          : [];
+      } else {
+        const item = localStorage.getItem(STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST);
+        return item ? JSON.parse(item) : [];
+      }
+    } catch {
+      return [];
+    }
+  },
+
+  async clearFriendChatMessages(pin: string): Promise<void> {
+    const cleanPin = pin.trim();
+    if (!cleanPin) return;
+    const key = `${STORAGE_KEYS.FRIEND_CHAT_ROOMS_PREFIX}${cleanPin}`;
+    try {
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.remove(key);
+      } else {
+        localStorage.removeItem(key);
+      }
+      // Also remove from saved room list
+      let rooms = await this.getSavedRoomsList();
+      rooms = rooms.filter((r) => r !== cleanPin);
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.set({ [STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST]: rooms });
+      } else {
+        localStorage.setItem(STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST, JSON.stringify(rooms));
+      }
+    } catch (err) {
+      logStorageError('Failed to clear room messages', err);
+    }
+  },
+
+  async recordRoomPinInList(pin: string): Promise<void> {
+    try {
+      let rooms: string[] = [];
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST);
+        rooms = Array.isArray(res[STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST])
+          ? res[STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST]
+          : [];
+      } else {
+        const item = localStorage.getItem(STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST);
+        rooms = item ? JSON.parse(item) : [];
+      }
+      if (!rooms.includes(pin)) {
+        rooms.push(pin);
+        if (isExtensionEnvironment()) {
+          await chrome.storage.local.set({ [STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST]: rooms });
+        } else {
+          localStorage.setItem(STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST, JSON.stringify(rooms));
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  },
+
+  async clearAllFriendChat(): Promise<void> {
+    try {
+      let rooms: string[] = [];
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST);
+        rooms = Array.isArray(res[STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST])
+          ? res[STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST]
+          : [];
+        const keysToRemove = [
+          STORAGE_KEYS.FRIEND_CHAT_SESSION,
+          STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST,
+          ...rooms.map((r) => `${STORAGE_KEYS.FRIEND_CHAT_ROOMS_PREFIX}${r}`),
+        ];
+        await chrome.storage.local.remove(keysToRemove);
+      } else {
+        const item = localStorage.getItem(STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST);
+        rooms = item ? JSON.parse(item) : [];
+        localStorage.removeItem(STORAGE_KEYS.FRIEND_CHAT_SESSION);
+        localStorage.removeItem(STORAGE_KEYS.FRIEND_CHAT_ROOMS_LIST);
+        rooms.forEach((r) =>
+          localStorage.removeItem(`${STORAGE_KEYS.FRIEND_CHAT_ROOMS_PREFIX}${r}`)
+        );
+      }
+    } catch (err) {
+      logStorageError('Failed to clear all friend chat data', err);
     }
   },
 };

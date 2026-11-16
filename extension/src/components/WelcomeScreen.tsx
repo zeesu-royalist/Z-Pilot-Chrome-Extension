@@ -41,9 +41,11 @@ interface WelcomeScreenProps {
   onOpenTodoList?: () => void;
   todosCount?: number;
   onOpenCalculator?: () => void;
+  onOpenClipboard?: () => void;
   onOpenClipBot?: () => void;
   clipsCount?: number;
   onOpenChat?: () => void;
+  unreadChatCount?: number;
   onOpenAdBlocker?: () => void;
   blockedAdsCount?: number;
 }
@@ -64,9 +66,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onOpenTodoList,
   todosCount = 0,
   onOpenCalculator,
+  onOpenClipboard,
   onOpenClipBot,
   clipsCount = 0,
   onOpenChat,
+  unreadChatCount = 0,
   onOpenAdBlocker,
   blockedAdsCount = 0,
 }) => {
@@ -160,19 +164,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       title: 'Advanced scientific calculator',
     },
     {
-      id: 'clipbot',
-      label: 'ClipBot',
+      id: 'Clipboard',
+      label: 'Clipboard',
       icon: ClipboardList,
-      onClick: onOpenClipBot,
+      onClick: onOpenClipboard || onOpenClipBot,
       badge: clipsCount > 0 ? (clipsCount > 9 ? '9+' : String(clipsCount)) : undefined,
-      title: 'ClipBot auto-clipboard history',
+      title: 'Clipboard auto-clipboard history',
     },
     {
       id: 'chat',
       label: 'Chat',
       icon: MessageCircle,
       onClick: onOpenChat,
-      badge: 'PIN',
+      badge: unreadChatCount > 0 ? String(unreadChatCount) : 'PIN',
       title: 'Instant friend chat',
     },
     {
@@ -273,8 +277,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             {feedback && (
               <div
                 className={`p-2 rounded-lg text-[11px] flex items-start space-x-1.5 ${feedback.success
-                    ? 'bg-orange-950/40 border border-orange-500/30 text-orange-200'
-                    : 'bg-rose-950/40 border border-rose-500/30 text-rose-300'
+                  ? 'bg-orange-950/40 border border-orange-500/30 text-orange-200'
+                  : 'bg-rose-950/40 border border-rose-500/30 text-rose-300'
                   }`}
               >
                 {feedback.success ? (
@@ -303,8 +307,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   onClick={() => setShowQuickGuide(!showQuickGuide)}
                   title={showQuickGuide ? 'Hide instructions' : 'How to get an API key step-by-step'}
                   className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all cursor-pointer ${showQuickGuide
-                      ? 'bg-orange-500 text-white border-orange-400'
-                      : 'bg-white/5 hover:bg-orange-500/20 text-orange-400 border-orange-500/30'
+                    ? 'bg-orange-500 text-white border-orange-400'
+                    : 'bg-white/5 hover:bg-orange-500/20 text-orange-400 border-orange-500/30'
                     }`}
                 >
                   <Info className="w-3 h-3" />

@@ -44,7 +44,7 @@ function schedulePersist(): void {
           .set({
             [SESSION_MEDIA_KEY]: mediaStore.serialize(),
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     } catch {
       // Ignore
@@ -286,10 +286,10 @@ chrome.runtime.onInstalled.addListener(() => {
               target: { tabId: tab.id },
               files: ['content.js'],
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }
 
   if (chrome.sidePanel && 'setPanelBehavior' in chrome.sidePanel) {
@@ -311,6 +311,29 @@ chrome.action.onClicked.addListener(async (tab) => {
     }
   }
 });
+
+// Click on chat notification opens side panel and activates friend chat
+if (chrome.notifications?.onClicked) {
+  chrome.notifications.onClicked.addListener(async (notificationId) => {
+    try {
+      if (chrome.notifications?.clear) {
+        chrome.notifications.clear(notificationId);
+      }
+      if (chrome.storage?.session) {
+        await chrome.storage.session.set({ zpilot_open_chat_pending: true }).catch(() => {});
+      }
+      broadcastMessage({ type: 'OPEN_FRIEND_CHAT' });
+      if (chrome.sidePanel && 'open' in chrome.sidePanel) {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.windowId) {
+          await chrome.sidePanel.open({ windowId: tab.windowId });
+        }
+      }
+    } catch {
+      // Ignore
+    }
+  });
+}
 
 // ============================================================================
 // Passive Network Media Sniffer (Zero-overhead O(1) header & URL inspection)
@@ -521,14 +544,14 @@ if (chrome.downloads?.onChanged) {
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   switch (request.type) {
-    case 'CLIPBOT_COPY': {
+    case 'Clipboard_COPY': {
       const { text, sourceUrl, sourceTitle } = request as {
         text?: string;
         sourceUrl?: string;
         sourceTitle?: string;
       };
       if (text && typeof text === 'string' && text.trim().length > 0) {
-        StorageService.addClipbotItem(text, sourceUrl, sourceTitle)
+        StorageService.addClipboardItem(text, sourceUrl, sourceTitle)
           .then((items) => {
             broadcastMessage({ type: 'CLIPBOT_UPDATED', items });
             sendResponse({ ok: true, count: items.length });
@@ -537,6 +560,25 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         return true;
       }
       sendResponse({ ok: false });
+      return false;
+    }
+
+    case 'SHOW_CHAT_NOTIFICATION': {
+      const { title, message } = request as { title?: string; message?: string };
+      try {
+        if (chrome.notifications && chrome.notifications.create) {
+          chrome.notifications.create(`chat_${Date.now()}`, {
+            type: 'basic',
+            iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+            title: title || 'Z-Pilot Friend Chat',
+            message: message || 'New message received',
+            priority: 2,
+          });
+        }
+      } catch {
+        // Ignore
+      }
+      sendResponse({ ok: true });
       return false;
     }
 
@@ -821,7 +863,8 @@ if (typeof chrome !== 'undefined' && chrome.alarms) {
 
 if (typeof chrome !== 'undefined' && chrome.notifications?.onClicked) {
   chrome.notifications.onClicked.addListener((notifId) => {
-    if (notifId.startsWith('notif_')) {
+    // Clear any notification type (todos use 'notif_', chats use 'chat_')
+    if (notifId.startsWith('notif_') || notifId.startsWith('chat_')) {
       chrome.notifications.clear(notifId);
     }
   });

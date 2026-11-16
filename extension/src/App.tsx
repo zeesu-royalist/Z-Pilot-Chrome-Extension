@@ -25,9 +25,10 @@ import { QuickNotesPanel } from './components/QuickNotesPanel.js';
 import { TranslatorPanel } from './components/TranslatorPanel.js';
 import { TodoListPanel } from './components/TodoListPanel.js';
 import { CalculatorPanel } from './components/CalculatorPanel.js';
-import { ClipBotPanel } from './components/ClipBotPanel.js';
+import { ClipboardPanel } from './components/ClipBotPanel.js';
 import { ChatPanel } from './components/ChatPanel.js';
 import { AdBlockerPanel } from './components/AdBlockerPanel.js';
+import { friendChatManager } from './services/instant-chat.js';
 
 export const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -60,12 +61,13 @@ export const App: React.FC = () => {
   // Advanced Calculator State
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
-  // ClipBot (Auto-Clipboard) State
-  const [isClipBotOpen, setIsClipBotOpen] = useState(false);
+  // Clipboard (Auto-Clipboard) State
+  const [isClipboardOpen, setIsClipboardOpen] = useState(false);
   const [clipsCount, setClipsCount] = useState(0);
 
   // Friend Chat State
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   // Add Blocker Ad Blocker State
   const [isAdBlockerOpen, setIsAdBlockerOpen] = useState(false);
@@ -113,8 +115,8 @@ export const App: React.FC = () => {
         setTodosCount(t.filter((item) => !item.completed).length)
       );
 
-      // Load ClipBot clips count
-      StorageService.getClipbotItems().then((c) => setClipsCount(c.length));
+      // Load Clipboard clips count
+      StorageService.getClipboardItems().then((c) => setClipsCount(c.length));
 
       // Query active tab ad blocking stats
       if (typeof chrome !== 'undefined' && chrome.tabs?.query) {
@@ -127,6 +129,18 @@ export const App: React.FC = () => {
             });
           }
         });
+      }
+
+      // Check if user clicked a friend chat notification to open panel
+      if (typeof chrome !== 'undefined' && chrome.storage?.session) {
+        chrome.storage.session.get('zpilot_open_chat_pending').then((res) => {
+          if (res?.zpilot_open_chat_pending) {
+            setIsChatOpen(true);
+            friendChatManager.setPanelOpen(true);
+            setUnreadChatCount(0);
+            chrome.storage.session.remove('zpilot_open_chat_pending').catch(() => {});
+          }
+        }).catch(() => {});
       }
 
       // Refresh active tab context
@@ -172,7 +186,11 @@ export const App: React.FC = () => {
         progress?: VideoDownloadProgress;
         items?: unknown[];
       }) => {
-        if (msg.type === 'AD_ELEMENTS_BLOCKED' && typeof msg.count === 'number') {
+        if (msg.type === 'OPEN_FRIEND_CHAT') {
+          setIsChatOpen(true);
+          friendChatManager.setPanelOpen(true);
+          setUnreadChatCount(0);
+        } else if (msg.type === 'AD_ELEMENTS_BLOCKED' && typeof msg.count === 'number') {
           setBlockedAdsCount((prev) => prev + (msg.count || 0));
         } else if (msg.type === 'CLIPBOT_UPDATED' && Array.isArray(msg.items)) {
           setClipsCount(msg.items.length);
@@ -208,8 +226,8 @@ export const App: React.FC = () => {
         changes: { [key: string]: chrome.storage.StorageChange },
         areaName: string
       ) => {
-        if (areaName === 'local' && changes['zpilot_clipbot_items']) {
-          const val = changes['zpilot_clipbot_items'].newValue;
+        if (areaName === 'local' && changes['zpilot_Clipboard_items']) {
+          const val = changes['zpilot_Clipboard_items'].newValue;
           if (Array.isArray(val)) {
             setClipsCount(val.length);
           }
@@ -231,6 +249,15 @@ export const App: React.FC = () => {
         }
       };
     }
+  }, []);
+
+  // Listen to Friend Chat updates & unread badges
+  useEffect(() => {
+    friendChatManager.initialize();
+    const unsub = friendChatManager.subscribe(() => {
+      setUnreadChatCount(friendChatManager.getState().unreadCount);
+    });
+    return unsub;
   }, []);
 
   // Sync messages to storage whenever updated
@@ -659,9 +686,15 @@ export const App: React.FC = () => {
         onOpenTodoList={() => setIsTodoListOpen(true)}
         todosCount={todosCount}
         onOpenCalculator={() => setIsCalculatorOpen(true)}
-        onOpenClipBot={() => setIsClipBotOpen(true)}
+        onOpenClipboard={() => setIsClipboardOpen(true)}
+        onOpenClipBot={() => setIsClipboardOpen(true)}
         clipsCount={clipsCount}
-        onOpenChat={() => setIsChatOpen(true)}
+        onOpenChat={() => {
+          setIsChatOpen(true);
+          friendChatManager.setPanelOpen(true);
+          setUnreadChatCount(0);
+        }}
+        unreadChatCount={unreadChatCount}
         onOpenAdBlocker={() => setIsAdBlockerOpen(true)}
         blockedAdsCount={blockedAdsCount}
         hasMessages={messages.length > 0}
@@ -686,9 +719,15 @@ export const App: React.FC = () => {
             onOpenTodoList={() => setIsTodoListOpen(true)}
             todosCount={todosCount}
             onOpenCalculator={() => setIsCalculatorOpen(true)}
-            onOpenClipBot={() => setIsClipBotOpen(true)}
+            onOpenClipboard={() => setIsClipboardOpen(true)}
+            onOpenClipBot={() => setIsClipboardOpen(true)}
             clipsCount={clipsCount}
-            onOpenChat={() => setIsChatOpen(true)}
+            onOpenChat={() => {
+              setIsChatOpen(true);
+              friendChatManager.setPanelOpen(true);
+              setUnreadChatCount(0);
+            }}
+            unreadChatCount={unreadChatCount}
             onOpenAdBlocker={() => setIsAdBlockerOpen(true)}
             blockedAdsCount={blockedAdsCount}
           />
@@ -781,19 +820,22 @@ export const App: React.FC = () => {
         onClose={() => setIsCalculatorOpen(false)}
       />
 
-      {/* ClipBot (Auto-Clipboard) Panel */}
-      <ClipBotPanel
-        isOpen={isClipBotOpen}
+      {/* Clipboard / ClipBot Panel */}
+      <ClipboardPanel
+        isOpen={isClipboardOpen}
         onClose={() => {
-          setIsClipBotOpen(false);
-          StorageService.getClipbotItems().then((c) => setClipsCount(c.length));
+          setIsClipboardOpen(false);
+          StorageService.getClipboardItems().then((c) => setClipsCount(c.length));
         }}
       />
 
       {/* Friend Chat Panel */}
       <ChatPanel
         isOpen={isChatOpen}
-        onClose={() => setIsChatOpen(false)}
+        onClose={() => {
+          setIsChatOpen(false);
+          friendChatManager.setPanelOpen(false);
+        }}
       />
 
       {/* Add Blocker Ad Blocker Panel */}

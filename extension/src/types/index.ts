@@ -293,4 +293,25 @@ export interface PageAdBlockStats {
   domain: string;
 }
 
+export type FriendChatMode = 'ptop' | 'group';
+
+export interface FriendChatMessage {
+  id: string;
+  text: string;
+  senderId: string;
+  senderName: string;
+  timestamp: number;
+  isMine: boolean;
+  delivered?: boolean;
+  mode?: FriendChatMode;
+  roomPin?: string;
+}
+
+export interface FriendChatSessionState {
+  activePin: string;
+  mode: FriendChatMode;
+  displayName: string;
+  connectedAt: number;
+}
+
 

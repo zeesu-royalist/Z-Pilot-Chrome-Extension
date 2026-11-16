@@ -435,3 +435,5 @@ export const ClipBotPanel: React.FC<ClipBotPanelProps> = ({
   );
 };
 
+export const ClipboardPanel = ClipBotPanel;
+

@@ -311,7 +311,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onClick={onOpenProfile}
               className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-xs text-white font-semibold transition-all shadow-md shadow-orange-600/30 flex items-center space-x-1.5 cursor-pointer active:scale-95 shrink-0"
             >
-              <span>Edit Profile</span>
+              <span>Edit</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
