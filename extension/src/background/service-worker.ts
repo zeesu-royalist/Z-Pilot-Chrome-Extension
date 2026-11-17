@@ -582,6 +582,28 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       return false;
     }
 
+    case 'CAPTURE_VISIBLE_TAB': {
+      try {
+        chrome.tabs.captureVisibleTab(
+          { format: 'jpeg', quality: 90 },
+          (dataUrl) => {
+            if (chrome.runtime.lastError || !dataUrl) {
+              sendResponse({
+                ok: false,
+                error: chrome.runtime.lastError?.message || 'Failed to capture tab',
+              });
+            } else {
+              sendResponse({ ok: true, dataUrl });
+            }
+          }
+        );
+        return true;
+      } catch (err: unknown) {
+        sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
+        return false;
+      }
+    }
+
     case 'ENSURE_YT_DNR_RULES': {
       if (dnrRulesReady) {
         sendResponse({ ok: true });

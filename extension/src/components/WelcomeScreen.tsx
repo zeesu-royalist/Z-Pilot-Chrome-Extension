@@ -22,6 +22,9 @@ import {
   ClipboardList,
   MessageCircle,
   ShieldCheck,
+  ArrowRightLeft,
+  ScanText,
+  ShoppingBag,
 } from 'lucide-react';
 import { GeminiClient, sanitizeApiKey } from '../services/gemini-client.js';
 
@@ -41,6 +44,10 @@ interface WelcomeScreenProps {
   onOpenTodoList?: () => void;
   todosCount?: number;
   onOpenCalculator?: () => void;
+  onOpenConverter?: () => void;
+  onOpenCleanCopyOcr?: () => void;
+  onOpenPrivacyBlur?: () => void;
+  onOpenShopping?: () => void;
   onOpenClipboard?: () => void;
   onOpenClipBot?: () => void;
   clipsCount?: number;
@@ -66,6 +73,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onOpenTodoList,
   todosCount = 0,
   onOpenCalculator,
+  onOpenConverter,
+  onOpenCleanCopyOcr,
+  onOpenPrivacyBlur,
+  onOpenShopping,
   onOpenClipboard,
   onOpenClipBot,
   clipsCount = 0,
@@ -162,6 +173,38 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       onClick: onOpenCalculator,
       badge: undefined,
       title: 'Advanced scientific calculator',
+    },
+    {
+      id: 'converter',
+      label: 'Converter',
+      icon: ArrowRightLeft,
+      onClick: onOpenConverter,
+      badge: undefined,
+      title: 'Currency, Unit & Timezone Converter',
+    },
+    {
+      id: 'clean_copy_ocr',
+      label: 'Clean & OCR',
+      icon: ScanText,
+      onClick: onOpenCleanCopyOcr,
+      badge: 'AI',
+      title: 'Clean Copy Studio & Image/Video OCR Extractor',
+    },
+    {
+      id: 'privacy_blur',
+      label: 'Privacy Blur',
+      icon: EyeOff,
+      onClick: onOpenPrivacyBlur,
+      badge: undefined,
+      title: 'Web Privacy, Element Blur & Drag-Drop Blur Masks',
+    },
+    {
+      id: 'shopping',
+      label: 'Shopping',
+      icon: ShoppingBag,
+      onClick: onOpenShopping,
+      badge: 'DEALS',
+      title: 'Price Tracker, Fake Review Shield & Coupons',
     },
     {
       id: 'Clipboard',

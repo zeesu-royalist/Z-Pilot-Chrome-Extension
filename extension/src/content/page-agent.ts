@@ -7,6 +7,7 @@
 import { scanDocumentVideos, extractBestPageVideoTitle } from './dom-video-scanner.js';
 import { StorageService } from '../services/storage.js';
 import { initAdShield, getPageBlockedCount } from './ad-shield.js';
+import { privacyBlurManager } from './privacy-blur.js';
 
 // Prevent duplicate execution if re-injected
 if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_PAGE_AGENT_LOADED) {
@@ -33,6 +34,25 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     }
   } catch {
     initAdShield(true);
+  }
+
+  // ── Auto-initialize Privacy Blur preferences for domain ──
+  try {
+    const currentHost = window.location.hostname.toLowerCase().replace(/^www\./, '');
+    StorageService.getPrivacyBlurPreferences(currentHost).then((prefs) => {
+      if (prefs) {
+        privacyBlurManager.updateConfig({
+          blurIntensity: prefs.blurIntensity,
+          blurStyle: prefs.blurStyle,
+          hoverToReveal: prefs.hoverToReveal,
+        });
+        if (prefs.autoBlurFinancials) privacyBlurManager.toggleAutoBlurFinancials(true);
+        if (prefs.autoBlurPii) privacyBlurManager.toggleAutoBlurPii(true);
+        if (prefs.autoBlurMedia) privacyBlurManager.toggleAutoBlurMedia(true);
+      }
+    }).catch(() => {});
+  } catch {
+    // Ignore
   }
 
   /**
@@ -460,6 +480,206 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
         return false;
       }
 
+      case 'CAPTURE_VIDEO_FRAME': {
+        try {
+          const videos = Array.from(document.querySelectorAll('video')) as HTMLVideoElement[];
+          const targetVideo =
+            videos.find((v) => !v.paused && v.currentTime > 0) ||
+            videos.find((v) => v.currentTime > 0) ||
+            videos[0];
+
+          if (!targetVideo) {
+            sendResponse({ ok: false, error: 'No active video found on this webpage.' });
+            return false;
+          }
+
+          const w = targetVideo.videoWidth || targetVideo.clientWidth || 640;
+          const h = targetVideo.videoHeight || targetVideo.clientHeight || 360;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.min(1920, w);
+          canvas.height = Math.min(1080, h);
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            sendResponse({ ok: false, error: 'Canvas 2D context not supported' });
+            return false;
+          }
+
+          ctx.drawImage(targetVideo, 0, 0, canvas.width, canvas.height);
+          let dataUrl = '';
+          try {
+            dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          } catch {
+            sendResponse({
+              ok: false,
+              error: 'Cross-origin video frame protected. Use "Capture Screen / Tab Snip" instead.',
+            });
+            return false;
+          }
+
+          const domSubtitles: string[] = [];
+          const captionNodes = document.querySelectorAll(
+            '.ytp-caption-segment, .caption-window, .vjs-text-track-display'
+          );
+          captionNodes.forEach((node) => {
+            const txt = node.textContent?.trim();
+            if (txt && !domSubtitles.includes(txt)) {
+              domSubtitles.push(txt);
+            }
+          });
+
+          sendResponse({
+            ok: true,
+            dataUrl,
+            videoTitle: document.title,
+            currentTime: targetVideo.currentTime,
+            duration: targetVideo.duration,
+            width: canvas.width,
+            height: canvas.height,
+            domSubtitles,
+          });
+          return false;
+        } catch (err: unknown) {
+          sendResponse({
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return false;
+        }
+      }
+
+      case 'GET_PAGE_IMAGES': {
+        try {
+          const imgs = Array.from(document.querySelectorAll('img')) as HTMLImageElement[];
+          const detected = imgs
+            .filter((img) => {
+              const src = img.currentSrc || img.src;
+              if (
+                !src ||
+                src.startsWith('data:image/svg') ||
+                src.includes('data:image/gif;base64,R0lGODlhAQAB')
+              ) {
+                return false;
+              }
+              const w = img.naturalWidth || img.clientWidth;
+              const h = img.naturalHeight || img.clientHeight;
+              return w >= 40 && h >= 40;
+            })
+            .slice(0, 30)
+            .map((img) => ({
+              src: img.currentSrc || img.src,
+              alt: img.alt?.trim() || undefined,
+              title: img.title?.trim() || undefined,
+              width: img.naturalWidth || img.clientWidth,
+              height: img.naturalHeight || img.clientHeight,
+            }));
+
+          sendResponse({ ok: true, images: detected });
+          return false;
+        } catch {
+          sendResponse({ ok: true, images: [] });
+          return false;
+        }
+      }
+
+      // ── Web Privacy & Blur Shield Handlers ──
+      case 'START_ELEMENT_BLUR_MODE': {
+        privacyBlurManager.enableClickToBlur(() => {
+          chrome.runtime.sendMessage({
+            type: 'PRIVACY_BLUR_STATS_UPDATED',
+            stats: privacyBlurManager.getStats(),
+          }).catch(() => {});
+        });
+        sendResponse({ ok: true, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'STOP_ELEMENT_BLUR_MODE': {
+        privacyBlurManager.disableClickToBlur();
+        sendResponse({ ok: true, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'START_DRAW_BLUR_BOX_MODE': {
+        privacyBlurManager.enableDrawBlurBox(() => {
+          chrome.runtime.sendMessage({
+            type: 'PRIVACY_BLUR_STATS_UPDATED',
+            stats: privacyBlurManager.getStats(),
+          }).catch(() => {});
+        });
+        sendResponse({ ok: true, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'STOP_DRAW_BLUR_BOX_MODE': {
+        privacyBlurManager.disableDrawBlurBox();
+        sendResponse({ ok: true, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'TOGGLE_AUTO_BLUR_FINANCIALS': {
+        const active = privacyBlurManager.toggleAutoBlurFinancials(request.enabled);
+        sendResponse({ ok: true, active, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'TOGGLE_AUTO_BLUR_PII': {
+        const active = privacyBlurManager.toggleAutoBlurPii(request.enabled);
+        sendResponse({ ok: true, active, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'TOGGLE_AUTO_BLUR_MEDIA': {
+        const active = privacyBlurManager.toggleAutoBlurMedia(request.enabled);
+        sendResponse({ ok: true, active, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'TOGGLE_PRIVACY_SCREEN': {
+        const active = privacyBlurManager.togglePrivacyScreen(request.enabled);
+        sendResponse({ ok: true, active, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'UPDATE_BLUR_CONFIG': {
+        privacyBlurManager.updateConfig(request.config || {});
+        sendResponse({ ok: true, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'GET_BLUR_STATS': {
+        sendResponse({ ok: true, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      case 'CLEAR_ALL_BLUR': {
+        privacyBlurManager.clearAllBlur();
+        sendResponse({ ok: true, stats: privacyBlurManager.getStats() });
+        return false;
+      }
+
+      // ── E-Commerce Product & Review Detection ──
+      case 'DETECT_ECOMMERCE_PRODUCT': {
+        try {
+          const product = extractPageProductData();
+          sendResponse({ ok: true, product });
+        } catch (err: unknown) {
+          sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
+        }
+        return false;
+      }
+
+      case 'EXTRACT_PAGE_COUPONS': {
+        try {
+          const coupons = extractOnPageCoupons();
+          sendResponse({ ok: true, coupons });
+        } catch {
+          sendResponse({ ok: true, coupons: [] });
+        }
+        return false;
+      }
+
       default:
         sendResponse({ error: 'Unknown action type in page agent' });
         return false;
@@ -595,4 +815,199 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
   document.addEventListener('copy', handleCopyAction, true);
   window.addEventListener('keydown', handleKeydownCopy, true);
   document.addEventListener('keydown', handleKeydownCopy, true);
+
+  // --------------------------------------------------------------------------
+  // E-Commerce Product & Review Extractor
+  // --------------------------------------------------------------------------
+  function extractPageProductData() {
+    const url = window.location.href;
+    const domain = window.location.hostname.replace(/^www\./, '');
+
+    let title = '';
+    let rawPriceText = '';
+    let imageUrl = '';
+    let rating: number | undefined;
+    let reviewCount: number | undefined;
+    const pageReviews: string[] = [];
+
+    // 1. Try structured JSON-LD first
+    try {
+      const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+      for (const s of Array.from(scripts)) {
+        try {
+          const json = JSON.parse(s.textContent || '');
+          const items = Array.isArray(json) ? json : [json];
+          for (const item of items) {
+            if (item['@type'] === 'Product' || item.offers || item.aggregateRating) {
+              if (item.name && !title) title = item.name;
+              if (item.image && !imageUrl) {
+                imageUrl = Array.isArray(item.image)
+                  ? item.image[0]
+                  : typeof item.image === 'string'
+                  ? item.image
+                  : item.image.url || '';
+              }
+              if (item.offers && !rawPriceText) {
+                const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers;
+                if (offer?.price) {
+                  rawPriceText = `${offer.priceCurrency || '$'} ${offer.price}`;
+                }
+              }
+              if (item.aggregateRating) {
+                if (item.aggregateRating.ratingValue && !rating) {
+                  rating = parseFloat(item.aggregateRating.ratingValue);
+                }
+                if (item.aggregateRating.reviewCount && !reviewCount) {
+                  reviewCount = parseInt(item.aggregateRating.reviewCount, 10);
+                }
+              }
+              if (item.review && Array.isArray(item.review)) {
+                item.review.slice(0, 10).forEach((r: any) => {
+                  const body = r.reviewBody || r.description;
+                  if (body && typeof body === 'string') pageReviews.push(body.trim());
+                });
+              }
+            }
+          }
+        } catch {
+          // Continue
+        }
+      }
+    } catch {
+      // Continue
+    }
+
+    // 2. OpenGraph Meta Tags
+    if (!title) {
+      title =
+        (document.querySelector('meta[property="og:title"]') as HTMLMetaElement)?.content || '';
+    }
+    if (!imageUrl) {
+      imageUrl =
+        (document.querySelector('meta[property="og:image"]') as HTMLMetaElement)?.content || '';
+    }
+    if (!rawPriceText) {
+      const ogPrice = (
+        document.querySelector(
+          'meta[property="og:price:amount"], meta[property="product:price:amount"]'
+        ) as HTMLMetaElement
+      )?.content;
+      const ogCurrency =
+        (
+          document.querySelector(
+            'meta[property="og:price:currency"], meta[property="product:price:currency"]'
+          ) as HTMLMetaElement
+        )?.content || '$';
+      if (ogPrice) rawPriceText = `${ogCurrency} ${ogPrice}`;
+    }
+
+    // 3. Retailer-Specific Selectors
+    if (!title) {
+      const el = document.querySelector(
+        '#productTitle, .product-title, h1[itemprop="name"], .B_NuCI, .x-item-title__mainTitle, .pdp-title'
+      );
+      if (el) title = el.textContent?.trim() || '';
+    }
+    if (!title) {
+      const h1 = document.querySelector('h1');
+      if (h1?.textContent) title = h1.textContent.trim();
+    }
+    if (!title) title = document.title;
+
+    if (!rawPriceText) {
+      const priceEl = document.querySelector(
+        '.a-price .a-offscreen, #priceblock_ourprice, #priceblock_dealprice, ._30jeq3._16Jk6d, [data-seo-id="hero-price"], .x-price-primary, .price-item--regular, .pdp-price, .product__price, span[itemprop="price"]'
+      );
+      if (priceEl) rawPriceText = priceEl.textContent?.trim() || '';
+    }
+
+    if (!rawPriceText) {
+      // Generic currency regex search in small leaf nodes
+      const priceCandidates = Array.from(document.querySelectorAll('span, div, p')).filter(
+        (el) => {
+          const txt = el.textContent?.trim() || '';
+          return /^[\$€£₹¥]\s?[0-9,]+(?:\.[0-9]{2})?$/.test(txt) && el.children.length === 0;
+        }
+      );
+      if (priceCandidates.length > 0) {
+        rawPriceText = priceCandidates[0].textContent?.trim() || '';
+      }
+    }
+
+    if (!imageUrl) {
+      const imgEl = document.querySelector(
+        '#landingImage, #imgBlkFront, .product-image img, [data-hook="main-image"], ._396cs4, .x-photos-min-view img'
+      ) as HTMLImageElement | null;
+      if (imgEl) imageUrl = imgEl.src || imgEl.currentSrc || '';
+    }
+
+    // Reviews extraction
+    if (pageReviews.length === 0) {
+      const reviewEls = document.querySelectorAll(
+        '[data-hook="review-body"], .review-text, ._6K-7Co, .customer-review, .user-review, [class*="review-content"]'
+      );
+      reviewEls.forEach((el) => {
+        const text = el.textContent?.trim();
+        if (text && text.length > 15 && pageReviews.length < 15) {
+          pageReviews.push(text.slice(0, 500));
+        }
+      });
+    }
+
+    // Rating extraction
+    if (!rating) {
+      const ratingEl = document.querySelector(
+        '#acrPopover, [data-hook="rating-out-of-text"], ._3LWZlK, [class*="rating-stars"]'
+      );
+      if (ratingEl) {
+        const match = ratingEl.textContent?.match(/([0-9]+(?:\.[0-9]+)?)/);
+        if (match) rating = parseFloat(match[1]);
+      }
+    }
+
+    return {
+      title: title.slice(0, 150),
+      url,
+      domain,
+      imageUrl: imageUrl || undefined,
+      rawPriceText,
+      rating: rating || undefined,
+      reviewCount: reviewCount || undefined,
+      pageReviews,
+    };
+  }
+
+  function extractOnPageCoupons() {
+    const coupons: Array<{
+      code: string;
+      discount: string;
+      description: string;
+      store: string;
+      verified: boolean;
+      source: 'page_found';
+    }> = [];
+    const domain = window.location.hostname.replace(/^www\./, '');
+
+    const promoEls = document.querySelectorAll(
+      '[class*="coupon"], [class*="promo"], [class*="voucher"], [data-coupon], .promo-banner, .discount-badge'
+    );
+
+    promoEls.forEach((el) => {
+      const txt = el.textContent?.trim() || '';
+      const match = txt.match(/\b([A-Z0-9]{4,15})\b/);
+      const discountMatch = txt.match(/(\d+%\s*OFF|\$\d+\s*OFF|₹\d+\s*OFF|FREE\s*SHIPPING)/i);
+      if (match && discountMatch && !coupons.some((c) => c.code === match[1])) {
+        coupons.push({
+          code: match[1],
+          discount: discountMatch[1].toUpperCase(),
+          description: txt.slice(0, 80),
+          store: domain,
+          verified: true,
+          source: 'page_found',
+        });
+      }
+    });
+
+    return coupons;
+  }
 }

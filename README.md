@@ -7,17 +7,17 @@
 
   <p align="center">
     <b>Turn your everyday browser into an AI-powered productivity workstation.</b><br>
-    Chat with any webpage • 1-Click video downloads • Ad & tracker blocking • Fast translation • Notes & Tasks
+    Chat with any webpage • 1-Click video downloads • Ad & tracker blocking • Clean Copy & Video OCR • Notes & Tasks
   </p>
 
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.0.3.zip">
-      <img src="https://img.shields.io/badge/⬇️_FREE_DOWNLOAD-Z--Pilot_v2.0.3_(ZIP)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Download Z-Pilot ZIP" />
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
+      <img src="https://img.shields.io/badge/⬇️_FREE_DOWNLOAD-Z--Pilot_v2.4.0_(ZIP)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Download Z-Pilot ZIP" />
     </a>
   </p>
 
   <p align="center">
-    <img src="https://img.shields.io/badge/Version-2.0.3-f97316?style=flat-square&logo=git&logoColor=white" alt="Version 2.0.3" />
+    <img src="https://img.shields.io/badge/Version-2.4.0-f97316?style=flat-square&logo=git&logoColor=white" alt="Version 2.4.0" />
     <img src="https://img.shields.io/badge/Engine-Google_Gemini-4285F4?style=flat-square&logo=google&logoColor=white" alt="Google Gemini" />
     <img src="https://img.shields.io/badge/Cost-100%25_FREE-10b981?style=flat-square&logo=cashapp&logoColor=white" alt="100% Free" />
     <img src="https://img.shields.io/badge/Privacy-100%25_Local_BYOK-8b5cf6?style=flat-square&logo=shield&logoColor=white" alt="Client Side Privacy" />
@@ -110,6 +110,36 @@ Instead of opening 10 different tabs or slowing down your computer with 8 separa
       Need help brainstorming, coding, or drafting an email? Chat freely with Gemini AI in a clean, distraction-free window.
     </td>
   </tr>
+  <tr>
+    <td width="50%">
+      <h3>🔄 Currency, Unit & Timezone</h3>
+      Live real-time exchange rates (35+ global fiat & crypto), 9 conversion categories (Length, Weight, Data, Speed, etc.), plus an interactive 24h World Clock & Meeting Planner.
+    </td>
+    <td width="50%">
+      <h3>👁️ "Clean Copy" & Video/Image OCR</h3>
+      Extract text from any image or active video frame with AI Vision. Strip UTM tracking links, unwrap broken PDF lines, and copy sanitized text in 1 click.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>🔒 Web Privacy &amp; Screen Blur Shield</h3>
+      Click-to-blur any page element, freehand drag-and-drop &amp; resizable blur masks, smart auto-obfuscation for financials ($/₹/balances) and PII (emails/phones), hover-to-peek reveal, and full-page privacy curtain.
+    </td>
+    <td width="50%">
+      <h3>🛍️ Smart Shopping &amp; Deal Hunter</h3>
+      Live price tracker with 90-day history visual, AI &amp; heuristic Fake Review Shield with adjusted real ratings, and 1-click verified store coupons finder.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>⚡ Instant P2P / Group Chat</h3>
+      Lightning-fast local network mesh chat with PIN-based rooms and zero backend server setup needed.
+    </td>
+    <td width="50%">
+      <h3>💬 Friend Chat AI</h3>
+      Need help brainstorming, coding, or drafting an email? Chat freely with Gemini AI in a clean, distraction-free window.
+    </td>
+  </tr>
 </table>
 
 ---
@@ -122,8 +152,8 @@ No coding or terminal knowledge required. Follow these 3 simple steps:
 Download the latest bundle and unzip it on your computer:
 
 <p>
-  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.0.3.zip">
-    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.0.3.zip-ea580c?style=flat-square&logo=googlechrome&logoColor=white" height="34" alt="Download ZIP" />
+  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.2.0.zip">
+    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.2.0.zip-ea580c?style=flat-square&logo=googlechrome&logoColor=white" height="34" alt="Download ZIP" />
   </a>
 </p>
 
@@ -198,7 +228,7 @@ Google Chrome, Brave, Microsoft Edge, Opera, Vivaldi, and any Chromium-based bro
   ### 🌟 Ready to upgrade your browser?
 
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.0.3.zip">
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.2.0.zip">
       <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-FREE_DOWNLOAD-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started" />
     </a>
   </p>

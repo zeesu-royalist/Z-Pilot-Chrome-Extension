@@ -1,4 +1,4 @@
-import { CalculationRecord, ChatMessage, ClipItem, FriendChatMessage, FriendChatSessionState, QuickNote, SavedTranslation, TodoItem, TodoPriority, UserProfile, UserSettings } from '../types/index.js';
+import { CalculationRecord, ChatMessage, CleanCopyOcrPreferences, ClipItem, ConverterPreferences, ExchangeRatesData, FriendChatMessage, FriendChatSessionState, PrivacyBlurPreferences, QuickNote, SavedTranslation, ShoppingPreferences, TodoItem, TodoPriority, TrackedProduct, UserProfile, UserSettings } from '../types/index.js';
 
 const STORAGE_KEYS = {
   MESSAGES: 'zpilot_messages',
@@ -12,6 +12,12 @@ const STORAGE_KEYS = {
   FRIEND_CHAT_SESSION: 'zpilot_friend_chat_session',
   FRIEND_CHAT_ROOMS_PREFIX: 'zpilot_friend_chat_room_',
   FRIEND_CHAT_ROOMS_LIST: 'zpilot_friend_chat_room_list',
+  CONVERTER_PREFS: 'zpilot_converter_prefs',
+  EXCHANGE_RATES: 'zpilot_exchange_rates',
+  CLEAN_COPY_PREFS: 'zpilot_clean_copy_prefs',
+  PRIVACY_BLUR_PREFS: 'zpilot_privacy_blur_prefs',
+  TRACKED_PRODUCTS: 'zpilot_tracked_products',
+  SHOPPING_PREFERENCES: 'zpilot_shopping_preferences',
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -793,6 +799,276 @@ export const StorageService = {
       }
     } catch (err) {
       logStorageError('Failed to clear all friend chat data', err);
+    }
+  },
+
+  // ── Converter & World Clock Storage ──
+
+  async getConverterPreferences(): Promise<ConverterPreferences> {
+    const defaults: ConverterPreferences = {
+      lastTab: 'currency',
+      currencyFrom: 'USD',
+      currencyTo: 'INR',
+      unitCategory: 'length',
+      unitFrom: 'm',
+      unitTo: 'ft',
+      selectedCities: ['new_york', 'london', 'mumbai', 'tokyo', 'dubai'],
+    };
+
+    try {
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(STORAGE_KEYS.CONVERTER_PREFS);
+        if (res[STORAGE_KEYS.CONVERTER_PREFS]) {
+          return { ...defaults, ...res[STORAGE_KEYS.CONVERTER_PREFS] };
+        }
+      } else {
+        const item = localStorage.getItem(STORAGE_KEYS.CONVERTER_PREFS);
+        if (item) {
+          return { ...defaults, ...JSON.parse(item) };
+        }
+      }
+    } catch (err) {
+      logStorageWarn('Error getting converter preferences', err);
+    }
+    return defaults;
+  },
+
+  async saveConverterPreferences(prefs: Partial<ConverterPreferences>): Promise<void> {
+    try {
+      const current = await this.getConverterPreferences();
+      const updated = { ...current, ...prefs };
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.set({ [STORAGE_KEYS.CONVERTER_PREFS]: updated });
+      } else {
+        localStorage.setItem(STORAGE_KEYS.CONVERTER_PREFS, JSON.stringify(updated));
+      }
+    } catch (err) {
+      logStorageError('Failed to save converter preferences', err);
+    }
+  },
+
+  async getCachedExchangeRates(): Promise<ExchangeRatesData | null> {
+    try {
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(STORAGE_KEYS.EXCHANGE_RATES);
+        return res[STORAGE_KEYS.EXCHANGE_RATES] || null;
+      } else {
+        const item = localStorage.getItem(STORAGE_KEYS.EXCHANGE_RATES);
+        return item ? JSON.parse(item) : null;
+      }
+    } catch (err) {
+      logStorageWarn('Error loading cached exchange rates', err);
+      return null;
+    }
+  },
+
+  async saveCachedExchangeRates(data: ExchangeRatesData): Promise<void> {
+    try {
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.set({ [STORAGE_KEYS.EXCHANGE_RATES]: data });
+      } else {
+        localStorage.setItem(STORAGE_KEYS.EXCHANGE_RATES, JSON.stringify(data));
+      }
+    } catch (err) {
+      logStorageError('Failed to cache exchange rates', err);
+    }
+  },
+
+  // ── Clean Copy & OCR Preferences ──
+
+  async getCleanCopyPreferences(): Promise<CleanCopyOcrPreferences> {
+    const defaults: CleanCopyOcrPreferences = {
+      lastTab: 'clean_copy',
+      autoCleanOnPaste: true,
+      lastOcrMode: 'raw',
+      targetTranslateLang: 'English',
+    };
+
+    try {
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(STORAGE_KEYS.CLEAN_COPY_PREFS);
+        if (res[STORAGE_KEYS.CLEAN_COPY_PREFS]) {
+          return { ...defaults, ...res[STORAGE_KEYS.CLEAN_COPY_PREFS] };
+        }
+      } else {
+        const item = localStorage.getItem(STORAGE_KEYS.CLEAN_COPY_PREFS);
+        if (item) {
+          return { ...defaults, ...JSON.parse(item) };
+        }
+      }
+    } catch (err) {
+      logStorageWarn('Error getting clean copy preferences', err);
+    }
+    return defaults;
+  },
+
+  async saveCleanCopyPreferences(prefs: Partial<CleanCopyOcrPreferences>): Promise<void> {
+    try {
+      const current = await this.getCleanCopyPreferences();
+      const updated = { ...current, ...prefs };
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.set({ [STORAGE_KEYS.CLEAN_COPY_PREFS]: updated });
+      } else {
+        localStorage.setItem(STORAGE_KEYS.CLEAN_COPY_PREFS, JSON.stringify(updated));
+      }
+    } catch (err) {
+      logStorageError('Failed to save clean copy preferences', err);
+    }
+  },
+
+  // ── Web Privacy & Blur Shield Preferences ──
+
+  async getPrivacyBlurPreferences(domain?: string): Promise<PrivacyBlurPreferences> {
+    const defaults: PrivacyBlurPreferences = {
+      blurIntensity: 12,
+      blurStyle: 'blur',
+      hoverToReveal: true,
+      autoBlurFinancials: false,
+      autoBlurPii: false,
+      autoBlurMedia: false,
+      rememberPerDomain: true,
+    };
+
+    try {
+      const key = domain
+        ? `${STORAGE_KEYS.PRIVACY_BLUR_PREFS}_${domain}`
+        : STORAGE_KEYS.PRIVACY_BLUR_PREFS;
+
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(key);
+        if (res[key]) {
+          return { ...defaults, ...res[key] };
+        }
+      } else {
+        const item = localStorage.getItem(key);
+        if (item) {
+          return { ...defaults, ...JSON.parse(item) };
+        }
+      }
+
+      // If domain override not found, fallback to global preferences
+      if (domain) {
+        return this.getPrivacyBlurPreferences();
+      }
+    } catch (err) {
+      logStorageWarn('Error getting privacy blur preferences', err);
+    }
+    return defaults;
+  },
+
+  async savePrivacyBlurPreferences(
+    prefs: Partial<PrivacyBlurPreferences>,
+    domain?: string
+  ): Promise<void> {
+    try {
+      const current = await this.getPrivacyBlurPreferences(domain);
+      const updated = { ...current, ...prefs };
+      const key = domain
+        ? `${STORAGE_KEYS.PRIVACY_BLUR_PREFS}_${domain}`
+        : STORAGE_KEYS.PRIVACY_BLUR_PREFS;
+
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.set({ [key]: updated });
+      } else {
+        localStorage.setItem(key, JSON.stringify(updated));
+      }
+    } catch (err) {
+      logStorageError('Failed to save privacy blur preferences', err);
+    }
+  },
+
+  // ── Tracked Products (Price Tracker) ──
+
+  async getTrackedProducts(): Promise<TrackedProduct[]> {
+    try {
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(STORAGE_KEYS.TRACKED_PRODUCTS);
+        return res[STORAGE_KEYS.TRACKED_PRODUCTS] || [];
+      } else {
+        const item = localStorage.getItem(STORAGE_KEYS.TRACKED_PRODUCTS);
+        return item ? JSON.parse(item) : [];
+      }
+    } catch (err) {
+      logStorageWarn('Error getting tracked products', err);
+      return [];
+    }
+  },
+
+  async saveTrackedProducts(products: TrackedProduct[]): Promise<void> {
+    try {
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.set({ [STORAGE_KEYS.TRACKED_PRODUCTS]: products });
+      } else {
+        localStorage.setItem(STORAGE_KEYS.TRACKED_PRODUCTS, JSON.stringify(products));
+      }
+    } catch (err) {
+      logStorageError('Error saving tracked products', err);
+    }
+  },
+
+  async addTrackedProduct(product: TrackedProduct): Promise<TrackedProduct[]> {
+    const existing = await this.getTrackedProducts();
+    const index = existing.findIndex((p) => p.url === product.url || p.id === product.id);
+    let updated: TrackedProduct[];
+    if (index >= 0) {
+      updated = [...existing];
+      updated[index] = { ...existing[index], ...product };
+    } else {
+      updated = [product, ...existing];
+    }
+    await this.saveTrackedProducts(updated);
+    return updated;
+  },
+
+  async removeTrackedProduct(id: string): Promise<TrackedProduct[]> {
+    const existing = await this.getTrackedProducts();
+    const updated = existing.filter((p) => p.id !== id);
+    await this.saveTrackedProducts(updated);
+    return updated;
+  },
+
+  async updateTrackedProduct(id: string, updates: Partial<TrackedProduct>): Promise<TrackedProduct[]> {
+    const existing = await this.getTrackedProducts();
+    const updated = existing.map((p) => (p.id === id ? { ...p, ...updates } : p));
+    await this.saveTrackedProducts(updated);
+    return updated;
+  },
+
+  // ── Shopping Preferences ──
+
+  async getShoppingPreferences(): Promise<ShoppingPreferences> {
+    const defaults: ShoppingPreferences = {
+      activeTab: 'price_tracker',
+      autoDetectProduct: true,
+      notifyOnPriceDrop: true,
+    };
+    try {
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(STORAGE_KEYS.SHOPPING_PREFERENCES);
+        return res[STORAGE_KEYS.SHOPPING_PREFERENCES]
+          ? { ...defaults, ...res[STORAGE_KEYS.SHOPPING_PREFERENCES] }
+          : defaults;
+      } else {
+        const item = localStorage.getItem(STORAGE_KEYS.SHOPPING_PREFERENCES);
+        return item ? { ...defaults, ...JSON.parse(item) } : defaults;
+      }
+    } catch (err) {
+      logStorageWarn('Error getting shopping preferences', err);
+      return defaults;
+    }
+  },
+
+  async saveShoppingPreferences(prefs: Partial<ShoppingPreferences>): Promise<void> {
+    try {
+      const current = await this.getShoppingPreferences();
+      const updated = { ...current, ...prefs };
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.set({ [STORAGE_KEYS.SHOPPING_PREFERENCES]: updated });
+      } else {
+        localStorage.setItem(STORAGE_KEYS.SHOPPING_PREFERENCES, JSON.stringify(updated));
+      }
+    } catch (err) {
+      logStorageError('Error saving shopping preferences', err);
     }
   },
 };

@@ -12,6 +12,10 @@ import {
   MessageCircle,
   Shield,
   MoreVertical,
+  ArrowRightLeft,
+  ScanText,
+  EyeOff,
+  ShoppingBag,
 } from 'lucide-react';
 import { BrandMark } from './BrandLogo.js';
 
@@ -29,6 +33,10 @@ interface HeaderProps {
   onOpenTodoList?: () => void;
   todosCount?: number;
   onOpenCalculator?: () => void;
+  onOpenConverter?: () => void;
+  onOpenCleanCopyOcr?: () => void;
+  onOpenPrivacyBlur?: () => void;
+  onOpenShopping?: () => void;
   onOpenClipboard?: () => void;
   onOpenClipBot?: () => void;
   clipsCount?: number;
@@ -52,6 +60,10 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTodoList,
   todosCount = 0,
   onOpenCalculator,
+  onOpenConverter,
+  onOpenCleanCopyOcr,
+  onOpenPrivacyBlur,
+  onOpenShopping,
   onOpenClipboard,
   onOpenClipBot,
   clipsCount = 0,
@@ -110,6 +122,34 @@ export const Header: React.FC<HeaderProps> = ({
       onClick: onOpenCalculator,
       badge: null,
       available: !!onOpenCalculator,
+    },
+    {
+      label: 'Converter',
+      icon: ArrowRightLeft,
+      onClick: onOpenConverter,
+      badge: null,
+      available: !!onOpenConverter,
+    },
+    {
+      label: 'Clean & OCR',
+      icon: ScanText,
+      onClick: onOpenCleanCopyOcr,
+      badge: null,
+      available: !!onOpenCleanCopyOcr,
+    },
+    {
+      label: 'Privacy Blur',
+      icon: EyeOff,
+      onClick: onOpenPrivacyBlur,
+      badge: null,
+      available: !!onOpenPrivacyBlur,
+    },
+    {
+      label: 'Shopping',
+      icon: ShoppingBag,
+      onClick: onOpenShopping,
+      badge: 'DEALS',
+      available: !!onOpenShopping,
     },
     {
       label: 'Clipboard',

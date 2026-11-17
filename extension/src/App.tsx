@@ -25,6 +25,10 @@ import { QuickNotesPanel } from './components/QuickNotesPanel.js';
 import { TranslatorPanel } from './components/TranslatorPanel.js';
 import { TodoListPanel } from './components/TodoListPanel.js';
 import { CalculatorPanel } from './components/CalculatorPanel.js';
+import { ConverterPanel } from './components/ConverterPanel.js';
+import { CleanCopyOcrPanel } from './components/CleanCopyOcrPanel.js';
+import { PrivacyBlurPanel } from './components/PrivacyBlurPanel.js';
+import { ShoppingAssistantPanel } from './components/ShoppingAssistantPanel.js';
 import { ClipboardPanel } from './components/ClipBotPanel.js';
 import { ChatPanel } from './components/ChatPanel.js';
 import { AdBlockerPanel } from './components/AdBlockerPanel.js';
@@ -60,6 +64,18 @@ export const App: React.FC = () => {
 
   // Advanced Calculator State
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+  // Currency, Unit & Timezone Converter State
+  const [isConverterOpen, setIsConverterOpen] = useState(false);
+
+  // Clean Copy Studio & Image/Video OCR Extractor State
+  const [isCleanCopyOcrOpen, setIsCleanCopyOcrOpen] = useState(false);
+
+  // Web Privacy & Blur Shield State
+  const [isPrivacyBlurOpen, setIsPrivacyBlurOpen] = useState(false);
+
+  // E-Commerce Shopping Assistant State
+  const [isShoppingOpen, setIsShoppingOpen] = useState(false);
 
   // Clipboard (Auto-Clipboard) State
   const [isClipboardOpen, setIsClipboardOpen] = useState(false);
@@ -686,6 +702,10 @@ export const App: React.FC = () => {
         onOpenTodoList={() => setIsTodoListOpen(true)}
         todosCount={todosCount}
         onOpenCalculator={() => setIsCalculatorOpen(true)}
+        onOpenConverter={() => setIsConverterOpen(true)}
+        onOpenCleanCopyOcr={() => setIsCleanCopyOcrOpen(true)}
+        onOpenPrivacyBlur={() => setIsPrivacyBlurOpen(true)}
+        onOpenShopping={() => setIsShoppingOpen(true)}
         onOpenClipboard={() => setIsClipboardOpen(true)}
         onOpenClipBot={() => setIsClipboardOpen(true)}
         clipsCount={clipsCount}
@@ -719,6 +739,10 @@ export const App: React.FC = () => {
             onOpenTodoList={() => setIsTodoListOpen(true)}
             todosCount={todosCount}
             onOpenCalculator={() => setIsCalculatorOpen(true)}
+            onOpenConverter={() => setIsConverterOpen(true)}
+            onOpenCleanCopyOcr={() => setIsCleanCopyOcrOpen(true)}
+            onOpenPrivacyBlur={() => setIsPrivacyBlurOpen(true)}
+            onOpenShopping={() => setIsShoppingOpen(true)}
             onOpenClipboard={() => setIsClipboardOpen(true)}
             onOpenClipBot={() => setIsClipboardOpen(true)}
             clipsCount={clipsCount}
@@ -818,6 +842,42 @@ export const App: React.FC = () => {
       <CalculatorPanel
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
+      />
+
+      {/* Currency, Unit & Timezone Converter Panel */}
+      <ConverterPanel
+        isOpen={isConverterOpen}
+        onClose={() => setIsConverterOpen(false)}
+      />
+
+      {/* Clean Copy Studio & Image/Video OCR Extractor Panel */}
+      <CleanCopyOcrPanel
+        isOpen={isCleanCopyOcrOpen}
+        onClose={() => setIsCleanCopyOcrOpen(false)}
+        geminiApiKey={settings.geminiApiKey}
+        onOpenSettings={() => {
+          setIsCleanCopyOcrOpen(false);
+          setIsSettingsOpen(true);
+        }}
+        onSendToChat={(text) => handleSendMessage(`Analyze and format this extracted text:\n\n${text}`)}
+        currentPageTitle={pageContext?.title}
+        currentPageUrl={pageContext?.url}
+      />
+
+      {/* Web Privacy & Blur Shield Panel */}
+      <PrivacyBlurPanel
+        isOpen={isPrivacyBlurOpen}
+        onClose={() => setIsPrivacyBlurOpen(false)}
+        currentPageUrl={pageContext?.url}
+      />
+
+      {/* Smart Shopping Assistant: Price Tracker, Fake Reviews & Coupons */}
+      <ShoppingAssistantPanel
+        isOpen={isShoppingOpen}
+        onClose={() => setIsShoppingOpen(false)}
+        currentPageUrl={pageContext?.url}
+        currentPageTitle={pageContext?.title}
+        geminiApiKey={settings.geminiApiKey}
       />
 
       {/* Clipboard / ClipBot Panel */}

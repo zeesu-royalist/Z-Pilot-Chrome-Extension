@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Z-Pilot - AI Browser Assistant",
-  "version": "2.0.3",
+  "version": "2.4.0",
   "description": "AI-Powered Browser Assistant, Automation Agent & Universal Video Downloader powered by Zeesu Royalist",
   "author": "Zeesu Royalist",
   "icons": {
@@ -53,6 +53,7 @@
     "https://generativelanguage.googleapis.com/*",
     "https://ntfy.sh/*",
     "https://ntfy.envs.net/*",
-    "https://ntfy.adminforge.de/*"
+    "https://ntfy.adminforge.de/*",
+    "https://open.er-api.com/*"
   ]
 }

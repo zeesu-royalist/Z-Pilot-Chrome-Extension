@@ -314,4 +314,244 @@ export interface FriendChatSessionState {
   connectedAt: number;
 }
 
+// ── Converter & World Clock Types ──
+
+export type ConverterTab = 'currency' | 'units' | 'timezone';
+
+export interface ExchangeRatesData {
+  base: string; // e.g. 'USD'
+  rates: Record<string, number>;
+  lastUpdated: number; // epoch ms
+  source?: string;
+}
+
+export type UnitCategory =
+  | 'length'
+  | 'weight'
+  | 'temperature'
+  | 'storage'
+  | 'area'
+  | 'volume'
+  | 'speed'
+  | 'time'
+  | 'pressure';
+
+export interface UnitDefinition {
+  id: string;
+  name: string;
+  symbol: string;
+  ratioToBase: number; // e.g. for km to m it's 1000
+}
+
+export interface TimezoneCity {
+  id: string;
+  name: string;
+  country: string;
+  timezone: string;
+  flag: string;
+}
+
+export interface ConverterPreferences {
+  lastTab: ConverterTab;
+  currencyFrom: string;
+  currencyTo: string;
+  unitCategory: UnitCategory;
+  unitFrom: string;
+  unitTo: string;
+  selectedCities: string[];
+}
+
+// ── Clean Copy & Instant Text/Image/Video Extractor (OCR) Types ──
+
+export type CleanCopyTab = 'clean_copy' | 'ocr_extractor';
+
+export type CaseStyle =
+  | 'title'
+  | 'sentence'
+  | 'upper'
+  | 'lower'
+  | 'camel'
+  | 'snake'
+  | 'kebab';
+
+export type OcrExtractMode =
+  | 'raw'
+  | 'markdown'
+  | 'translate'
+  | 'code'
+  | 'summarize';
+
+export interface CleanCopyOptions {
+  stripTrackingUrls?: boolean;
+  unwrapLines?: boolean;
+  cleanQuotesAndChars?: boolean;
+  stripCitations?: boolean;
+  stripQuotesPrefix?: boolean;
+  convertHtmlToMarkdown?: boolean;
+  caseStyle?: CaseStyle;
+}
+
+export interface TextStats {
+  charactersWithSpaces: number;
+  charactersNoSpaces: number;
+  words: number;
+  sentences: number;
+  paragraphs: number;
+  readingTimeMinutes: number;
+}
+
+export interface WebpageVideoFrame {
+  dataUrl: string;
+  videoTitle?: string;
+  currentTime?: number;
+  duration?: number;
+  width?: number;
+  height?: number;
+  domSubtitles?: string[];
+}
+
+export interface DetectedPageImage {
+  src: string;
+  alt?: string;
+  title?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface OcrExtractionResult {
+  text: string;
+  mode: OcrExtractMode;
+  confidence?: string;
+  sourceType: 'image' | 'video' | 'screen';
+  isAiGenerated: boolean;
+  timestamp: number;
+}
+
+export interface CleanCopyOcrPreferences {
+  lastTab: CleanCopyTab;
+  autoCleanOnPaste: boolean;
+  lastOcrMode: OcrExtractMode;
+  targetTranslateLang?: string;
+}
+
+// ── Web Privacy & Blur Shield Types ──
+
+export type BlurStyle = 'blur' | 'blackout' | 'stealth';
+
+export interface PrivacyBlurBoxData {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PrivacyBlurStats {
+  blurredElementCount: number;
+  customBoxCount: number;
+  financialsBlurred: boolean;
+  piiBlurred: boolean;
+  mediaBlurred: boolean;
+  privacyScreenActive: boolean;
+  blurIntensity: number; // 4 to 30 px
+  blurStyle: BlurStyle;
+  hoverToReveal: boolean;
+}
+
+export interface PrivacyBlurPreferences {
+  blurIntensity: number;
+  blurStyle: BlurStyle;
+  hoverToReveal: boolean;
+  autoBlurFinancials: boolean;
+  autoBlurPii: boolean;
+  autoBlurMedia: boolean;
+  rememberPerDomain: boolean;
+}
+
+// ── E-Commerce Shopping Assistant Types ──
+
+export type ShoppingTab = 'price_tracker' | 'fake_reviews' | 'coupons';
+
+export interface PriceHistoryPoint {
+  date: string; // YYYY-MM-DD
+  price: number;
+  label?: string; // 'Lowest' | 'Highest' | 'Typical'
+}
+
+export interface ProductInfo {
+  title: string;
+  url: string;
+  domain: string;
+  imageUrl?: string;
+  currentPrice: number;
+  originalPrice?: number;
+  currency: string;
+  rating?: number;
+  reviewCount?: number;
+  inStock?: boolean;
+  seller?: string;
+  rawPriceText?: string;
+  pageReviews?: string[];
+}
+
+export interface FakeReviewMetric {
+  name: string;
+  score: number; // 0 - 100
+  status: 'safe' | 'warning' | 'danger';
+  detail: string;
+}
+
+export interface FakeReviewAnalysis {
+  trustGrade: 'A' | 'B' | 'C' | 'D' | 'F';
+  trustScore: number; // 0 - 100
+  originalRating: number;
+  adjustedRating: number;
+  suspiciousCount: number;
+  totalAnalyzed: number;
+  verdict: 'Genuine & Reliable' | 'Moderate Concern' | 'High Risk / Likely Inauthentic';
+  summary: string;
+  pros: string[];
+  cons: string[];
+  redFlags: string[];
+  metrics: FakeReviewMetric[];
+}
+
+export interface CouponCode {
+  code: string;
+  discount: string;
+  description: string;
+  store: string;
+  expiry?: string;
+  verified: boolean;
+  successRate?: number;
+  source: 'page_found' | 'store_database';
+}
+
+export interface TrackedProduct {
+  id: string;
+  url: string;
+  domain: string;
+  title: string;
+  imageUrl?: string;
+  currency: string;
+  initialPrice: number;
+  currentPrice: number;
+  targetPrice?: number;
+  highestPrice: number;
+  lowestPrice: number;
+  history: PriceHistoryPoint[];
+  dateAdded: number;
+  lastChecked: number;
+  priceDropAlert: boolean;
+}
+
+export interface ShoppingPreferences {
+  activeTab: ShoppingTab;
+  autoDetectProduct: boolean;
+  notifyOnPriceDrop: boolean;
+}
+
+
+
+
 
