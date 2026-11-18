@@ -39,8 +39,10 @@
     "activeTab",
     "scripting",
     "storage",
+    "unlimitedStorage",
     "downloads",
     "notifications",
+    "alarms",
     "webRequest",
     "declarativeNetRequestWithHostAccess"
   ],

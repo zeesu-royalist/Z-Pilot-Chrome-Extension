@@ -1579,6 +1579,17 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
         return false;
       }
 
+      case 'SHOW_REMINDER_TOAST': {
+        const { todo } = request as {
+          todo: { id: string; title: string; description?: string; dueDate?: number };
+        };
+        if (todo && window === window.top) {
+          showInPageReminderToast(todo);
+          sendResponse({ ok: true });
+        }
+        return false;
+      }
+
       default:
         // Do not call sendResponse here to avoid prematurely closing the message port for other handlers
         return false;
@@ -2304,5 +2315,182 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     });
 
     return coupons;
+  }
+
+  // --------------------------------------------------------------------------
+  // In-Page Tasks & Reminders Alert Banner
+  // --------------------------------------------------------------------------
+
+  function playInPageReminderChime(): void {
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.75);
+    } catch {
+      // Audio context may require user interaction on some pages
+    }
+  }
+
+  function showInPageReminderToast(todo: {
+    id: string;
+    title: string;
+    description?: string;
+    dueDate?: number;
+  }): void {
+    playInPageReminderChime();
+
+    const existingToast = document.getElementById('zpilot-reminder-toast');
+    if (existingToast) {
+      existingToast.remove();
+    }
+
+    const container = document.createElement('div');
+    container.id = 'zpilot-reminder-toast';
+    container.setAttribute('role', 'alert');
+    container.style.cssText = `
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 2147483647;
+      width: 340px;
+      max-width: calc(100vw - 48px);
+      background: linear-gradient(135deg, rgba(16, 8, 4, 0.98), rgba(28, 14, 7, 0.98));
+      border: 1.5px solid rgba(249, 115, 22, 0.6);
+      border-radius: 14px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7), 0 0 24px rgba(249, 115, 22, 0.25);
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 14px 16px;
+      box-sizing: border-box;
+      animation: zpilotSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    `;
+
+    if (!document.getElementById('zpilot-reminder-toast-style')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'zpilot-reminder-toast-style';
+      styleEl.textContent = `
+        @keyframes zpilotSlideIn {
+          from { transform: translateX(40px) scale(0.95); opacity: 0; }
+          to { transform: translateX(0) scale(1); opacity: 1; }
+        }
+        @keyframes zpilotPulseBell {
+          0%, 100% { transform: rotate(0deg); }
+          20%, 60% { transform: rotate(-15deg); }
+          40%, 80% { transform: rotate(15deg); }
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+
+    const escapeHtml = (str: string) =>
+      str.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m] || m));
+
+    const safeTitle = escapeHtml(todo.title);
+    const safeDesc = todo.description ? escapeHtml(todo.description) : '';
+
+    container.innerHTML = `
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="display:inline-block; font-size:18px; animation: zpilotPulseBell 1.5s ease-in-out infinite;">⏰</span>
+          <span style="font-size:11px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#fb923c;">
+            Z-Pilot Reminder
+          </span>
+        </div>
+        <button id="zpilot-toast-close" style="background:transparent; border:none; color:rgba(255,255,255,0.6); font-size:16px; cursor:pointer; line-height:1; padding:2px 4px; border-radius:4px;">✕</button>
+      </div>
+      <div style="font-size:14px; font-weight:700; color:#ffffff; line-height:1.35; margin-bottom:${safeDesc ? '4px' : '10px'}; word-break:break-word;">
+        ${safeTitle}
+      </div>
+      ${
+        safeDesc
+          ? `<div style="font-size:12px; color:rgba(255,255,255,0.7); line-height:1.3; margin-bottom:12px; max-height:48px; overflow:hidden; text-overflow:ellipsis; word-break:break-word;">${safeDesc}</div>`
+          : ''
+      }
+      <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+        <button id="zpilot-toast-done" style="flex:1; background:linear-gradient(135deg, #16a34a, #15803d); color:#ffffff; border:none; border-radius:8px; padding:7px 10px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-shadow:0 2px 8px rgba(22,163,74,0.3);">
+          ✓ Mark Done
+        </button>
+        <button id="zpilot-toast-snooze" style="flex:1; background:rgba(255,255,255,0.1); color:#ffedd5; border:1px solid rgba(249,115,22,0.4); border-radius:8px; padding:7px 10px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px;">
+          💤 Snooze 10m
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(container);
+
+    let dismissTimeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      container.style.opacity = '0';
+      container.style.transform = 'translateY(-10px)';
+      container.style.transition = 'all 0.3s ease';
+      setTimeout(() => container.remove(), 300);
+    }, 25000);
+
+    const closeToast = () => {
+      if (dismissTimeout) clearTimeout(dismissTimeout);
+      container.style.opacity = '0';
+      container.style.transform = 'translateY(-10px)';
+      container.style.transition = 'all 0.3s ease';
+      setTimeout(() => container.remove(), 300);
+    };
+
+    container.addEventListener('mouseenter', () => {
+      if (dismissTimeout) {
+        clearTimeout(dismissTimeout);
+        dismissTimeout = null;
+      }
+    });
+
+    container.addEventListener('mouseleave', () => {
+      if (!dismissTimeout) {
+        dismissTimeout = setTimeout(closeToast, 10000);
+      }
+    });
+
+    const closeBtn = container.querySelector('#zpilot-toast-close');
+    closeBtn?.addEventListener('click', closeToast);
+
+    const doneBtn = container.querySelector('#zpilot-toast-done');
+    doneBtn?.addEventListener('click', () => {
+      try {
+        chrome.runtime.sendMessage({ type: 'TOGGLE_TODO_DONE', todoId: todo.id });
+      } catch {
+        // Ignore
+      }
+      if (doneBtn instanceof HTMLElement) {
+        doneBtn.innerText = '✓ Completed!';
+        doneBtn.style.background = '#15803d';
+      }
+      setTimeout(closeToast, 600);
+    });
+
+    const snoozeBtn = container.querySelector('#zpilot-toast-snooze');
+    snoozeBtn?.addEventListener('click', () => {
+      try {
+        chrome.runtime.sendMessage({ type: 'SNOOZE_TODO', todoId: todo.id, minutes: 10 });
+      } catch {
+        // Ignore
+      }
+      if (snoozeBtn instanceof HTMLElement) {
+        snoozeBtn.innerText = '💤 Snoozed!';
+      }
+      setTimeout(closeToast, 600);
+    });
   }
 }

@@ -9,7 +9,9 @@ import {
   VideoScanResult,
   VideoDownloadProgress,
   CleanCopyTab,
+  TodoItem,
 } from './types/index.js';
+import { Bell, Check, Clock, X } from 'lucide-react';
 import { StorageService } from './services/storage.js';
 import { ApiService } from './services/api.js';
 import { BrowserActionService } from './services/browser-actions.js';
@@ -24,7 +26,7 @@ import { ProfileModal } from './components/ProfileModal.js';
 import { VideoScannerPanel } from './components/VideoScannerPanel.js';
 import { QuickNotesPanel } from './components/QuickNotesPanel.js';
 import { TranslatorPanel } from './components/TranslatorPanel.js';
-import { TodoListPanel } from './components/TodoListPanel.js';
+import { TodoListPanel, playReminderChime } from './components/TodoListPanel.js';
 import { CalculatorPanel } from './components/CalculatorPanel.js';
 import { ConverterPanel } from './components/ConverterPanel.js';
 import { CleanCopyOcrPanel } from './components/CleanCopyOcrPanel.js';
@@ -62,6 +64,7 @@ export const App: React.FC = () => {
   // Tasks & Reminders State
   const [isTodoListOpen, setIsTodoListOpen] = useState(false);
   const [todosCount, setTodosCount] = useState(0);
+  const [activeReminder, setActiveReminder] = useState<TodoItem | null>(null);
 
   // Advanced Calculator State
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
@@ -208,6 +211,7 @@ export const App: React.FC = () => {
         count?: number;
         progress?: VideoDownloadProgress;
         items?: unknown[];
+        todo?: TodoItem;
       }) => {
         if (msg.type === 'OPEN_FRIEND_CHAT') {
           setIsChatOpen(true);
@@ -217,6 +221,18 @@ export const App: React.FC = () => {
           setBlockedAdsCount((prev) => prev + (msg.count || 0));
         } else if (msg.type === 'CLIPBOT_UPDATED' && Array.isArray(msg.items)) {
           setClipsCount(msg.items.length);
+        } else if (msg.type === 'TODO_REMINDER_ALERT' && msg.todo) {
+          setActiveReminder(msg.todo);
+          playReminderChime();
+          StorageService.getTodos().then((list) => {
+            setTodosCount(list.filter((t) => !t.completed).length);
+          });
+        } else if (msg.type === 'OPEN_TODO_PANEL') {
+          setIsTodoListOpen(true);
+        } else if (msg.type === 'TODO_UPDATED') {
+          StorageService.getTodos().then((list) => {
+            setTodosCount(list.filter((t) => !t.completed).length);
+          });
         } else if (msg.type === 'SNIFFED_MEDIA_UPDATED' && msg.tabId === activeTabIdRef.current) {
           setSniffedCount(msg.count || 0);
         } else if (msg.type === 'DOWNLOAD_PROGRESS' && msg.progress) {
@@ -253,6 +269,12 @@ export const App: React.FC = () => {
           const val = changes['zpilot_Clipboard_items'].newValue;
           if (Array.isArray(val)) {
             setClipsCount(val.length);
+          }
+        }
+        if (areaName === 'local' && changes['zpilot_todos']) {
+          const val = changes['zpilot_todos'].newValue;
+          if (Array.isArray(val)) {
+            setTodosCount(val.filter((t: any) => !t.completed).length);
           }
         }
       };
@@ -689,6 +711,77 @@ export const App: React.FC = () => {
     handleClearHistory();
   };
 
+  // Periodic scanner to catch overdue reminders while sidepanel is active
+  useEffect(() => {
+    const checkOverdue = async () => {
+      try {
+        const todos = await StorageService.getTodos();
+        const now = Date.now();
+        let changed = false;
+        const updated = todos.map((t) => {
+          if (!t.completed && t.reminderSet && t.dueDate && t.dueDate <= now && !t.notified) {
+            setActiveReminder(t);
+            playReminderChime();
+            changed = true;
+            return { ...t, notified: true };
+          }
+          return t;
+        });
+        if (changed) {
+          await StorageService.saveTodos(updated);
+          setTodosCount(updated.filter((t) => !t.completed).length);
+        }
+      } catch {
+        // Ignore
+      }
+    };
+
+    const interval = setInterval(checkOverdue, 4000);
+    checkOverdue();
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleCompleteReminder = async () => {
+    if (!activeReminder) return;
+    const id = activeReminder.id;
+    setActiveReminder(null);
+    try {
+      const updated = await StorageService.updateTodo(id, { completed: true });
+      setTodosCount(updated.filter((t) => !t.completed).length);
+      if (typeof chrome !== 'undefined' && chrome.alarms) {
+        chrome.alarms.clear(`todo_${id}`);
+      }
+      if (typeof chrome !== 'undefined' && chrome.notifications) {
+        chrome.notifications.clear(`notif_${id}`);
+      }
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleSnoozeReminder = async () => {
+    if (!activeReminder) return;
+    const id = activeReminder.id;
+    const newDue = Date.now() + 10 * 60 * 1000;
+    setActiveReminder(null);
+    try {
+      const updated = await StorageService.updateTodo(id, {
+        dueDate: newDue,
+        reminderSet: true,
+        notified: false,
+      });
+      setTodosCount(updated.filter((t) => !t.completed).length);
+      if (typeof chrome !== 'undefined' && chrome.alarms) {
+        chrome.alarms.create(`todo_${id}`, { when: newDue });
+      }
+      if (typeof chrome !== 'undefined' && chrome.notifications) {
+        chrome.notifications.clear(`notif_${id}`);
+      }
+    } catch {
+      // Ignore
+    }
+  };
+
   return (
     <div
       className={`flex flex-col h-screen w-full text-white overflow-hidden font-sans select-none relative transition-colors duration-500 ${messages.length === 0 ? 'ember-bg-home' : 'ember-bg-chat'
@@ -727,6 +820,67 @@ export const App: React.FC = () => {
         onOpenAutofillProfile={() => setIsProfileOpen(true)}
         hasMessages={messages.length > 0}
       />
+
+      {/* Global Task Reminder Alert Banner (visible across all views if a reminder fires) */}
+      {activeReminder && (
+        <div className="relative z-40 mx-3 my-2 p-3 bg-gradient-to-r from-[#241006] via-[#1c0c04] to-[#241006] border border-orange-500/50 rounded-xl shadow-[0_8px_24px_rgba(249,115,22,0.25)] animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-start justify-between gap-2.5">
+            <div className="flex items-start space-x-2.5 flex-1 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center shrink-0 mt-0.5">
+                <Bell className="w-4 h-4 text-orange-400 animate-bounce" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-[10px] font-bold tracking-wider text-orange-400 uppercase">
+                    ⏰ Task Reminder
+                  </span>
+                </div>
+                <div className="text-xs font-semibold text-white truncate mt-0.5">
+                  {activeReminder.title}
+                </div>
+                {activeReminder.description && (
+                  <div className="text-[11px] text-orange-200/70 truncate mt-0.5">
+                    {activeReminder.description}
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveReminder(null)}
+              className="p-1 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
+              title="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-orange-500/20">
+            <button
+              onClick={handleCompleteReminder}
+              className="flex-1 flex items-center justify-center space-x-1 px-2.5 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-medium shadow-sm transition-all active:scale-[0.98]"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Mark Done</span>
+            </button>
+            <button
+              onClick={handleSnoozeReminder}
+              className="flex-1 flex items-center justify-center space-x-1 px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-orange-500/30 text-orange-200 rounded-lg text-xs font-medium transition-all active:scale-[0.98]"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Snooze 10m</span>
+            </button>
+            <button
+              onClick={() => {
+                setIsTodoListOpen(true);
+                setActiveReminder(null);
+              }}
+              className="px-2.5 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 text-orange-300 rounded-lg text-xs font-medium transition-all"
+            >
+              View
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main View: Screenshot 1 Home Screen vs Screenshot 2 Active Chat Stream */}
       {messages.length === 0 ? (

@@ -842,6 +842,57 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
       return false;
     }
 
+    case 'TOGGLE_TODO_DONE': {
+      const { todoId } = request as { todoId: string };
+      (async () => {
+        try {
+          const result = await chrome.storage.local.get('zpilot_todos');
+          const todos = Array.isArray(result.zpilot_todos) ? result.zpilot_todos : [];
+          const updated = todos.map((t: { id: string; completed?: boolean }) =>
+            t.id === todoId ? { ...t, completed: true } : t
+          );
+          await chrome.storage.local.set({ zpilot_todos: updated });
+          if (chrome.alarms) {
+            chrome.alarms.clear(`todo_${todoId}`);
+          }
+          if (chrome.notifications) {
+            chrome.notifications.clear(`notif_${todoId}`);
+          }
+          broadcastMessage({ type: 'TODO_UPDATED' });
+          sendResponse({ ok: true });
+        } catch (e) {
+          sendResponse({ ok: false, error: String(e) });
+        }
+      })();
+      return true;
+    }
+
+    case 'SNOOZE_TODO': {
+      const { todoId, minutes = 10 } = request as { todoId: string; minutes?: number };
+      (async () => {
+        try {
+          const result = await chrome.storage.local.get('zpilot_todos');
+          const todos = Array.isArray(result.zpilot_todos) ? result.zpilot_todos : [];
+          const newDueDate = Date.now() + Math.max(1, minutes) * 60 * 1000;
+          const updated = todos.map((t: { id: string; dueDate?: number; reminderSet?: boolean; notified?: boolean }) =>
+            t.id === todoId ? { ...t, dueDate: newDueDate, reminderSet: true, notified: false } : t
+          );
+          await chrome.storage.local.set({ zpilot_todos: updated });
+          if (chrome.alarms) {
+            chrome.alarms.create(`todo_${todoId}`, { when: newDueDate });
+          }
+          if (chrome.notifications) {
+            chrome.notifications.clear(`notif_${todoId}`);
+          }
+          broadcastMessage({ type: 'TODO_UPDATED' });
+          sendResponse({ ok: true, dueDate: newDueDate });
+        } catch (e) {
+          sendResponse({ ok: false, error: String(e) });
+        }
+      })();
+      return true;
+    }
+
     default:
       return false;
   }
@@ -851,30 +902,111 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 // TODO & REMINDER NOTIFICATIONS (chrome.alarms + chrome.notifications)
 // ============================================================================
 
+interface StoredTodoItem {
+  id: string;
+  title: string;
+  description?: string;
+  completed?: boolean;
+  reminderSet?: boolean;
+  dueDate?: number;
+  notified?: boolean;
+  priority?: string;
+}
+
+async function triggerReminderAlert(todo: StoredTodoItem): Promise<void> {
+  // 1. Chrome Desktop Notification (OS level)
+  if (chrome.notifications) {
+    try {
+      chrome.notifications.create(`notif_${todo.id}`, {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: '⏰ Z-Pilot Task Reminder',
+        message: todo.title + (todo.description ? ` — ${todo.description}` : ''),
+        priority: 2,
+        requireInteraction: true,
+      });
+    } catch (e) {
+      console.warn('[ServiceWorker] Failed to create notification:', e);
+    }
+  }
+
+  // 2. Broadcast to open sidepanel views
+  broadcastMessage({ type: 'TODO_REMINDER_ALERT', todo });
+
+  // 3. Dispatch SHOW_REMINDER_TOAST to active tab(s) top frame
+  try {
+    const tabs = await chrome.tabs.query({ active: true });
+    for (const tab of tabs) {
+      if (tab.id) {
+        chrome.tabs
+          .sendMessage(tab.id, { type: 'SHOW_REMINDER_TOAST', todo }, { frameId: 0 })
+          .catch(() => {
+            // Ignored if content script is not running or restricted page
+          });
+      }
+    }
+  } catch (e) {
+    // Ignore tab query errors
+  }
+}
+
+async function checkOverdueReminders(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get('zpilot_todos');
+    const todos: StoredTodoItem[] = Array.isArray(result.zpilot_todos) ? result.zpilot_todos : [];
+    const now = Date.now();
+    let hasChanges = false;
+
+    const updated = todos.map((todo) => {
+      if (
+        !todo.completed &&
+        todo.reminderSet &&
+        todo.dueDate &&
+        todo.dueDate <= now &&
+        !todo.notified
+      ) {
+        hasChanges = true;
+        void triggerReminderAlert(todo);
+        return { ...todo, notified: true };
+      }
+      return todo;
+    });
+
+    if (hasChanges) {
+      await chrome.storage.local.set({ zpilot_todos: updated });
+      broadcastMessage({ type: 'TODO_UPDATED' });
+    }
+  } catch (err) {
+    console.error('[ServiceWorker] checkOverdueReminders error:', err);
+  }
+}
+
 if (typeof chrome !== 'undefined' && chrome.alarms) {
+  // Setup 1-minute periodic alarm to catch any overdue reminders (e.g. after sleep/suspend)
+  chrome.alarms.get('check_overdue_reminders', (alarm) => {
+    if (!alarm) {
+      chrome.alarms.create('check_overdue_reminders', { periodInMinutes: 1 });
+    }
+  });
+
   chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name === 'check_overdue_reminders') {
+      await checkOverdueReminders();
+      return;
+    }
+
     if (alarm.name.startsWith('todo_')) {
       const todoId = alarm.name.replace('todo_', '');
       try {
         const result = await chrome.storage.local.get('zpilot_todos');
-        const todos = Array.isArray(result.zpilot_todos) ? result.zpilot_todos : [];
-        const todo = todos.find((t: { id: string }) => t.id === todoId);
+        const todos: StoredTodoItem[] = Array.isArray(result.zpilot_todos) ? result.zpilot_todos : [];
+        const todo = todos.find((t) => t.id === todoId);
         if (todo && !todo.completed && !todo.notified) {
-          if (chrome.notifications) {
-            chrome.notifications.create(`notif_${todo.id}`, {
-              type: 'basic',
-              iconUrl: 'icons/icon128.png',
-              title: '⏰ Z-Pilot Task Reminder',
-              message: todo.title + (todo.description ? ` - ${todo.description}` : ''),
-              priority: 2,
-              requireInteraction: true,
-            });
-          }
-          const updated = todos.map((t: { id: string }) =>
+          const updated = todos.map((t) =>
             t.id === todoId ? { ...t, notified: true } : t
           );
           await chrome.storage.local.set({ zpilot_todos: updated });
-          broadcastMessage({ type: 'TODO_REMINDER_ALERT', todo });
+          await triggerReminderAlert(todo);
         }
       } catch (err) {
         console.error('[ServiceWorker] Alarm handling error:', err);
@@ -883,11 +1015,34 @@ if (typeof chrome !== 'undefined' && chrome.alarms) {
   });
 }
 
+// Initial check when background script boots / resumes
+if (typeof chrome !== 'undefined') {
+  void checkOverdueReminders();
+  if (chrome.runtime?.onStartup) {
+    chrome.runtime.onStartup.addListener(() => {
+      void checkOverdueReminders();
+    });
+  }
+}
+
 if (typeof chrome !== 'undefined' && chrome.notifications?.onClicked) {
-  chrome.notifications.onClicked.addListener((notifId) => {
+  chrome.notifications.onClicked.addListener(async (notifId) => {
     // Clear any notification type (todos use 'notif_', chats use 'chat_')
     if (notifId.startsWith('notif_') || notifId.startsWith('chat_')) {
       chrome.notifications.clear(notifId);
+    }
+    if (notifId.startsWith('notif_')) {
+      try {
+        if (chrome.sidePanel && 'open' in chrome.sidePanel) {
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (tab?.windowId) {
+            await chrome.sidePanel.open({ windowId: tab.windowId });
+          }
+        }
+        broadcastMessage({ type: 'OPEN_TODO_PANEL' });
+      } catch (e) {
+        // Ignore
+      }
     }
   });
 }

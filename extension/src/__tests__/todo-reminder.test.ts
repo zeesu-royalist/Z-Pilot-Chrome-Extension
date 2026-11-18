@@ -93,5 +93,56 @@ describe('Todo & Reminder System', () => {
   it('playReminderChime runs safely without crashing environment', () => {
     expect(() => playReminderChime()).not.toThrow();
   });
+
+  it('snoozes a reminder by updating dueDate and clearing notified flag', async () => {
+    const todo = await StorageService.addTodo({
+      title: 'Review PR #42',
+      dueDate: Date.now() - 1000,
+      reminderSet: true,
+    });
+
+    // Mark as notified initially
+    await StorageService.updateTodo(todo.id, { notified: true });
+    let current = await StorageService.getTodos();
+    expect(current[0].notified).toBe(true);
+
+    // Snooze by 10 minutes
+    const snoozeDue = Date.now() + 10 * 60 * 1000;
+    const updated = await StorageService.updateTodo(todo.id, {
+      dueDate: snoozeDue,
+      reminderSet: true,
+      notified: false,
+    });
+
+    expect(updated[0].dueDate).toBe(snoozeDue);
+    expect(updated[0].notified).toBe(false);
+    expect(updated[0].reminderSet).toBe(true);
+  });
+
+  it('detects overdue uncompleted reminders correctly', async () => {
+    const pastTime = Date.now() - 5000;
+    const futureTime = Date.now() + 60000;
+
+    await StorageService.addTodo({
+      title: 'Overdue task',
+      dueDate: pastTime,
+      reminderSet: true,
+    });
+
+    await StorageService.addTodo({
+      title: 'Future task',
+      dueDate: futureTime,
+      reminderSet: true,
+    });
+
+    const all = await StorageService.getTodos();
+    const now = Date.now();
+    const overdue = all.filter(
+      (t) => !t.completed && t.reminderSet && t.dueDate && t.dueDate <= now && !t.notified
+    );
+
+    expect(overdue).toHaveLength(1);
+    expect(overdue[0].title).toBe('Overdue task');
+  });
 });
 

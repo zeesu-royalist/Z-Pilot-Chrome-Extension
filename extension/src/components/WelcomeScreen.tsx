@@ -248,7 +248,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     },
     {
       id: 'clean_copy_ocr',
-      label: 'Clean & OCR',
+      label: 'Clean Copy',
       icon: ScanText,
       onClick: onOpenCleanCopyOcr,
       badge: clipsCount > 0 ? (clipsCount > 9 ? '9+' : String(clipsCount)) : 'AI',

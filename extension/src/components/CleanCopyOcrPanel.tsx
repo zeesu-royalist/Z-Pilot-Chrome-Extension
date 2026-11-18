@@ -610,7 +610,7 @@ export const CleanCopyOcrPanel: React.FC<CleanCopyOcrPanelProps> = ({
           <BrandMark size={28} className="shrink-0" />
           <div className="flex flex-col">
             <span className="text-sm font-bold text-white tracking-tight flex items-center space-x-1.5">
-              <span>Clean, OCR & Clipboard</span>
+              <span>Copy Anything, Clipboard</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-orange-500/20 text-orange-400 font-mono font-semibold border border-orange-500/30">
                 PRO
               </span>

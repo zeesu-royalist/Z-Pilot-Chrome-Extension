@@ -222,6 +222,9 @@ export const TodoListPanel: React.FC<TodoListPanelProps> = ({
       const calculated = parseYMDAndHHMM(reminderDate, reminderTime);
       if (calculated > Date.now()) {
         finalDue = calculated;
+      } else if (calculated > Date.now() - 60000) {
+        // Schedule for next 5 seconds if chosen time is the current minute
+        finalDue = Date.now() + 5000;
       }
     }
 
@@ -312,10 +315,11 @@ export const TodoListPanel: React.FC<TodoListPanelProps> = ({
   // Save inline edit for existing task
   const handleSaveInlineEdit = async (taskId: string) => {
     const ts = parseYMDAndHHMM(inlineEditDate, inlineEditTime);
-    if (ts <= Date.now()) return;
+    const finalTs = ts <= Date.now() && ts > Date.now() - 60000 ? Date.now() + 5000 : ts;
+    if (finalTs <= Date.now()) return;
 
     const updated = await StorageService.updateTodo(taskId, {
-      dueDate: ts,
+      dueDate: finalTs,
       reminderSet: true,
       notified: false,
     });
@@ -485,6 +489,8 @@ export const TodoListPanel: React.FC<TodoListPanelProps> = ({
               <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5">
                 <span className="text-[10px] text-orange-400/90 font-bold shrink-0">Quick:</span>
                 {[
+                  { label: '+2m', mins: 2 },
+                  { label: '+5m', mins: 5 },
                   { label: '+15m', mins: 15 },
                   { label: '+30m', mins: 30 },
                   { label: '+1h', mins: 60 },
