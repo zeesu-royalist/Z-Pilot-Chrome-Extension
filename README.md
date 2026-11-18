@@ -11,13 +11,13 @@
   </p>
 
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip" title="1-Click Download Z-Pilot v2.4.0 ZIP">
-      <img src="https://img.shields.io/badge/⬇️_FREE_DOWNLOAD-Z--Pilot_v2.4.0_(ZIP)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Download Z-Pilot v2.4.0" />
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.1.zip" title="1-Click Download Z-Pilot v2.4.1 ZIP">
+      <img src="https://img.shields.io/badge/⬇️_FREE_DOWNLOAD-Z--Pilot_v2.4.1_(ZIP)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Download Z-Pilot v2.4.1" />
     </a>
   </p>
 
   <p align="center">
-    <img src="https://img.shields.io/badge/Version-2.4.0-f97316?style=flat-square&logo=git&logoColor=white" alt="Version 2.4.0" />
+    <img src="https://img.shields.io/badge/Version-2.4.1-f97316?style=flat-square&logo=git&logoColor=white" alt="Version 2.4.1" />
     <img src="https://img.shields.io/badge/Engine-Google_Gemini-4285F4?style=flat-square&logo=google&logoColor=white" alt="Google Gemini" />
     <img src="https://img.shields.io/badge/Cost-100%25_FREE-10b981?style=flat-square&logo=cashapp&logoColor=white" alt="100% Free" />
     <img src="https://img.shields.io/badge/Privacy-100%25_Local_BYOK-8b5cf6?style=flat-square&logo=shield&logoColor=white" alt="Client Side Privacy" />
@@ -51,12 +51,21 @@
 
   <!-- ── LIVE PRODUCT SHOWCASE / AD BANNER ── -->
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip" title="1-Click Download Z-Pilot v2.4.0">
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.1.zip" title="1-Click Download Z-Pilot v2.4.1">
       <img src="assets/z-pilot-live-showcase.jpg" width="100%" alt="Z-Pilot AI Browser Agent - Live LinkedIn Job Autofill & AI Copilot" style="max-width: 900px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 36px rgba(0,0,0,0.5);" />
     </a>
   </p>
 
 </div>
+
+---
+
+> [!TIP]
+> **🎉 What's New in v2.4.1:**
+> * ⏰ **Multi-Tier Task & Reminder Alerts**: Guaranteed on-time alerts with sound chime, floating in-page toast on any active browsing tab, sidepanel banner, and background sleep/wake recovery.
+> * 🛍️ **Smart Shopping Assistant Upgrades**: Authentic price history (Current, Lowest & Highest), real-time product reviews extraction, and live store coupons across Amazon, Flipkart, Myntra & Meesho.
+> * 🎬 **Responsive Video Downloader**: Fluid responsive button toolbar that never overflows on small sidepanel windows.
+> * 📋 **Copy Anything & Video OCR PRO**: Instant tracking parameter cleanup, PDF line unwrapping, and AI screen text OCR.
 
 ---
 
@@ -162,11 +171,11 @@ Instead of opening 10 different tabs or slowing down your computer with 8 separa
 No coding or terminal knowledge required. Follow these simple steps:
 
 ### 1️⃣ Step 1: 1-Click Download Bundle
-Click to download the latest ultra-lightweight ZIP bundle (~360 KB):
+Click to download the latest ultra-lightweight ZIP bundle (~370 KB):
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
-    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.4.0.zip-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="38" alt="Download ZIP" />
+  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.1.zip">
+    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.4.1.zip-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="38" alt="Download ZIP" />
   </a>
 </p>
 
@@ -242,8 +251,8 @@ Google Chrome, Brave, Microsoft Edge, Opera, Vivaldi, and any Chromium-based bro
   ### 🌟 Ready to upgrade your browser?
 
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
-      <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-FREE_DOWNLOAD-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started with v2.4.0" />
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.1.zip">
+      <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-FREE_DOWNLOAD-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started with v2.4.1" />
     </a>
   </p>
 

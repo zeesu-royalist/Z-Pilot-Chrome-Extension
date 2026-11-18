@@ -603,7 +603,7 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
               </span>
             </span>
             <span className="text-[10.5px] text-zinc-400">
-              Price Tracker • Fake Review Shield • Instant Coupons
+              Price, Review & Coupons Tracker
             </span>
           </div>
         </div>
