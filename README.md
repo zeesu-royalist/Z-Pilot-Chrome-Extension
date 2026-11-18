@@ -12,7 +12,7 @@
 
   <!-- ── LIVE PRODUCT SHOWCASE / AD BANNER ── -->
   <p align="center">
-    <a href="release/z-pilot-v2.4.0" title="Go to Z-Pilot Extension Folder">
+    <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0" title="Go to Z-Pilot Extension Folder">
       <img src="assets/z-pilot-live-showcase.jpg" width="100%" alt="Z-Pilot AI Browser Agent - Live LinkedIn Job Autofill & AI Copilot" style="max-width: 900px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 36px rgba(0,0,0,0.5);" />
     </a>
   </p>
@@ -21,8 +21,8 @@
   </p>
 
   <p align="center">
-    <a href="release/z-pilot-v2.4.0">
-      <img src="https://img.shields.io/badge/📂_GET_EXTENSION-release%2Fz--pilot--v2.4.0-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Open Z-Pilot v2.4.0 Folder" />
+    <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0">
+      <img src="https://img.shields.io/badge/⬇️_GET_Z--PILOT_v2.4.0-(FOLDER)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Get Z-Pilot v2.4.0 Folder" />
     </a>
   </p>
 
@@ -38,7 +38,7 @@
   <p align="center">
     <a href="#-why-z-pilot"><b>💡 Why Z-Pilot</b></a> &nbsp;•&nbsp;
     <a href="#-superpowers"><b>⚡ Superpowers</b></a> &nbsp;•&nbsp;
-    <a href="#-quick-install-in-1-minute"><b>🚀 1-Min Install</b></a> &nbsp;•&nbsp;
+    <a href="#-quick-install-1-click-drag--drop"><b>🚀 1-Click Install</b></a> &nbsp;•&nbsp;
     <a href="#-get-free-ai-key"><b>🔑 Free AI Key</b></a> &nbsp;•&nbsp;
     <a href="#-faq"><b>❓ FAQ</b></a>
   </p>
@@ -156,12 +156,18 @@ Instead of opening 10 different tabs or slowing down your computer with 8 separa
 
 ## 🚀 Quick Install (1-Click Drag & Drop!)
 
-No terminal commands, no building, and **zero extracting needed**! The extension is already built and ready in the **[`release/z-pilot-v2.4.0`](release/z-pilot-v2.4.0)** folder:
+<p align="center">
+  <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0">
+    <img src="https://img.shields.io/badge/📂_OPEN_EXTENSION_FOLDER-release%2Fz--pilot--v2.4.0-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="38" alt="Open Extension Folder" />
+  </a>
+</p>
+
+No terminal commands, no building, and **zero extracting needed**! The extension is already built and ready in the **[`release/z-pilot-v2.4.0`](https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0)** folder:
 
 1. Open **`chrome://extensions`** in your browser.
    *(Using Brave? `brave://extensions` • Using Edge? `edge://extensions`)*
 2. In the top-right corner, **turn ON "Developer mode"**.
-3. Simply **Drag & Drop** the folder **[`release/z-pilot-v2.4.0`](release/z-pilot-v2.4.0)** directly into the extensions window (or click **"Load unpacked"** and select it).
+3. Simply **Drag & Drop** the folder **[`release/z-pilot-v2.4.0`](https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0)** directly into the extensions window (or click **"Load unpacked"** and select it).
 4. Click the browser puzzle icon (🧩) and **Pin (📌) Z-Pilot** to your toolbar.
 
 🎉 **Done! Click the Z-Pilot icon to open your AI browser side panel.**
@@ -215,8 +221,8 @@ Google Chrome, Brave, Microsoft Edge, Opera, Vivaldi, and any Chromium-based bro
   ### 🌟 Ready to upgrade your browser?
 
   <p align="center">
-    <a href="release/z-pilot-v2.4.0">
-      <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-LOAD_EXTENSION-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started" />
+    <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0">
+      <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-OPEN_v2.4.0_FOLDER-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started with v2.4.0" />
     </a>
   </p>
 
