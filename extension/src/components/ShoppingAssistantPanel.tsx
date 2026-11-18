@@ -814,7 +814,7 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
                           {EcommerceAssistantService.formatPrice(product.currentPrice, product.currency)}
                         </span>
                         <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">
-                          {product.dealBadge ? product.dealBadge.slice(0, 20) : '🔥 All-Time Low!'}
+                          {product.dealBadge ? product.dealBadge.slice(0, 20) : 'All-Time Low!'}
                         </span>
                       </div>
 

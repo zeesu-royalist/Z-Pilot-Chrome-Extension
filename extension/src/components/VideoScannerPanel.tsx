@@ -383,7 +383,7 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
           return (
             <div
               key={video.id}
-              className="p-3.5 rounded-2xl bg-gradient-to-b from-[#140603] via-[#0d0302] to-[#070201] border border-white/10 hover:border-orange-500/40 transition-all space-y-3 shadow-xl shadow-black/60"
+              className="p-3.5 rounded-2xl bg-gradient-to-b from-[#140603] via-[#0d0302] to-[#070201] border border-white/10 hover:border-orange-500/40 transition-all space-y-3 shadow-xl shadow-black/60 overflow-hidden"
             >
               {/* Top Row: Thumbnail + Metadata */}
               <div className="flex items-start space-x-3">
@@ -481,24 +481,24 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
                 </div>
               )}
 
-              {/* Bottom Action Row: Clear Dual Buttons (Video & Audio) */}
-              <div className="flex items-center space-x-2 pt-0.5">
+              {/* Bottom Action Row: Responsive Dual Buttons (Video & Audio) + Utilities */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                 {isActive ? (
                   <button
                     onClick={() => onCancelDownload(video)}
-                    className="flex-1 py-2 px-3 rounded-lg bg-white/10 hover:bg-rose-950/60 border border-white/15 hover:border-rose-500/40 text-white/90 hover:text-rose-200 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap"
+                    className="flex-1 min-w-0 py-2 px-3 rounded-lg bg-white/10 hover:bg-rose-950/60 border border-white/15 hover:border-rose-500/40 text-white/90 hover:text-rose-200 text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap"
                   >
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-400" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-400 shrink-0" />
                     <span className="whitespace-nowrap">Cancel Download</span>
                   </button>
                 ) : isCompleted ? (
                   <div
-                    className={`flex-1 py-2 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center space-x-1.5 animate-fade-in shadow-md whitespace-nowrap ${isAudioAction
+                    className={`flex-1 min-w-0 py-2 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center space-x-1.5 animate-fade-in shadow-md whitespace-nowrap ${isAudioAction
                         ? 'bg-amber-950/50 border-amber-500/40 text-amber-200'
                         : 'bg-emerald-950/50 border-emerald-500/40 text-emerald-200'
                       }`}
                   >
-                    <CheckCircle2 className={`w-3.5 h-3.5 ${isAudioAction ? 'text-amber-400' : 'text-emerald-400'}`} />
+                    <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${isAudioAction ? 'text-amber-400' : 'text-emerald-400'}`} />
                     <span className="whitespace-nowrap">{isAudioAction ? 'Audio Downloaded!' : 'Video Downloaded!'}</span>
                   </div>
                 ) : (
@@ -509,28 +509,28 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
                         onClick={() => handleDownloadClick(video)}
                         disabled={isAnyDownloadActive}
                         title={isAnyDownloadActive ? 'Another download is in progress' : undefined}
-                        className={`flex-1 py-2 px-3 rounded-lg text-white text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors whitespace-nowrap ${isAnyDownloadActive
+                        className={`flex-1 min-w-0 py-2 px-3 rounded-lg text-white text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors whitespace-nowrap ${isAnyDownloadActive
                             ? 'bg-orange-600/40 opacity-50 cursor-not-allowed'
                             : 'bg-orange-600 hover:bg-orange-500 cursor-pointer active:scale-[0.98]'
                           }`}
                       >
-                        <Headphones className="w-3.5 h-3.5" />
+                        <Headphones className="w-3.5 h-3.5 shrink-0" />
                         <span className="whitespace-nowrap">Download Audio</span>
                       </button>
                     ) : (
-                      <>
+                      <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
                         {/* Video Download Button */}
                         <button
                           onClick={() => handleDownloadClick(video)}
                           disabled={isAnyDownloadActive}
                           title={isAnyDownloadActive ? 'Another download is in progress' : undefined}
-                          className={`flex-1 py-2 px-3 rounded-lg text-white text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors whitespace-nowrap ${isAnyDownloadActive
+                          className={`flex-1 min-w-0 py-2 px-2.5 rounded-lg text-white text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors whitespace-nowrap ${isAnyDownloadActive
                               ? 'bg-orange-600/40 opacity-50 cursor-not-allowed'
                               : 'bg-orange-600 hover:bg-orange-500 cursor-pointer active:scale-[0.98]'
                             }`}
                         >
-                          <Download className="w-3.5 h-3.5" />
-                          <span className="whitespace-nowrap">Download Video</span>
+                          <Download className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Download Video</span>
                         </button>
 
                         {/* Dedicated Audio Button on Video card */}
@@ -542,41 +542,43 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
                               ? 'Another download is in progress'
                               : 'Download pure audio track (MP3/M4A) from this video'
                           }
-                          className={`py-2 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors shrink-0 whitespace-nowrap ${isAnyDownloadActive
+                          className={`py-2 px-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center space-x-1.5 transition-colors shrink-0 whitespace-nowrap ${isAnyDownloadActive
                               ? 'bg-white/5 border-white/5 text-white/30 opacity-50 cursor-not-allowed'
                               : 'bg-white/10 hover:bg-white/15 border-white/15 text-white/90 hover:text-white cursor-pointer active:scale-[0.98]'
                             }`}
                         >
-                          <Headphones className="w-3.5 h-3.5 text-amber-400" />
+                          <Headphones className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                           <span className="whitespace-nowrap">Audio (MP3)</span>
                         </button>
-                      </>
+                      </div>
                     )}
                   </>
                 )}
 
                 {/* Utility Buttons: Copy Link & Open Link */}
-                <button
-                  onClick={() => handleCopyUrl(video)}
-                  title="Copy media URL"
-                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer shrink-0"
-                >
-                  {copiedId === video.id ? (
-                    <Check className="w-3.5 h-3.5 text-orange-400" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                </button>
+                <div className="flex items-center gap-1 shrink-0 ml-auto">
+                  <button
+                    onClick={() => handleCopyUrl(video)}
+                    title="Copy media URL"
+                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer shrink-0"
+                  >
+                    {copiedId === video.id ? (
+                      <Check className="w-3.5 h-3.5 text-orange-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
 
-                <a
-                  href={video.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Open media URL in new tab"
-                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors shrink-0"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                  <a
+                    href={video.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Open media URL in new tab"
+                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors shrink-0"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
               </div>
             </div>
           );
