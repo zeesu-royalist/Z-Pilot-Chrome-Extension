@@ -1068,7 +1068,9 @@ export const StorageService = {
 
   // ── Auto-Saved Price History Cache for All Visited Products ──
 
-  async getCachedProductPrice(productKey: string): Promise<{ history: PriceHistoryPoint[]; lastPrice?: number } | null> {
+  async getCachedProductPrice(
+    productKey: string
+  ): Promise<{ history: PriceHistoryPoint[]; lastPrice?: number; lastChecked?: number } | null> {
     try {
       const sanitizedKey = `${STORAGE_KEYS.PRICE_HISTORY_CACHE}_${productKey.slice(0, 100)}`;
       if (isExtensionEnvironment()) {

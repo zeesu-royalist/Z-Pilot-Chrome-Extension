@@ -61,6 +61,7 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
   const [trackedProducts, setTrackedProducts] = useState<TrackedProduct[]>([]);
   const [isTrackedCurrent, setIsTrackedCurrent] = useState<boolean>(false);
   const [lastRecordedPrice, setLastRecordedPrice] = useState<number | null>(null);
+  const [lastCheckedTimestamp, setLastCheckedTimestamp] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Live active tab URL and title
@@ -114,9 +115,16 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
 
       const doSend = (): Promise<any> =>
         new Promise((resolve) => {
-          chrome.tabs.sendMessage(targetId as number, message, (res) => {
+          chrome.tabs.sendMessage(targetId as number, message, { frameId: 0 }, (res) => {
             if (chrome.runtime.lastError) {
-              resolve(null);
+              // Fallback without frameId for environments that do not support frameId option
+              chrome.tabs.sendMessage(targetId as number, message, (fallbackRes) => {
+                if (chrome.runtime.lastError) {
+                  resolve(null);
+                } else {
+                  resolve(fallbackRes);
+                }
+              });
             } else {
               resolve(res);
             }
@@ -243,19 +251,18 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
         // Retrieve automatic persistent price cache
         const cached = await StorageService.getCachedProductPrice(productKey);
 
-        // Check if tracked in wishlist
-        const existingTracked = freshTracked.find(
-          (p) => p.url === parsedProduct.url || (p.title === parsedProduct.title && p.domain === parsedProduct.domain)
-        );
+        // Check if tracked in wishlist with ASIN / PID / clean URL intelligence
+        const existingTracked = freshTracked.find((p) => isMatchingProduct(p, parsedProduct!));
 
         // Determine last recorded price from previous check (tracked or cached)
         const previousPrice = existingTracked?.currentPrice || cached?.lastPrice;
-        if (previousPrice && previousPrice !== parsedProduct.currentPrice) {
+        const previousTime = existingTracked?.lastChecked || cached?.lastChecked;
+        if (previousPrice) {
           setLastRecordedPrice(previousPrice);
-        } else if (previousPrice) {
-          setLastRecordedPrice(previousPrice);
+          setLastCheckedTimestamp(previousTime || null);
         } else {
           setLastRecordedPrice(null);
+          setLastCheckedTimestamp(null);
         }
 
         // Combine history from tracked wishlist or persistent cache
@@ -463,15 +470,30 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
     };
   }, [isOpen]);
 
-  // Check if current product is in tracked list
+  // Smart product matching across URL queries, ASIN, PID, and title
+  const isMatchingProduct = (tracked: TrackedProduct, target: ProductInfo): boolean => {
+    if (tracked.url === target.url) return true;
+    const tClean = (tracked.url || '').split('?')[0];
+    const targetClean = (target.url || '').split('?')[0];
+    if (tClean && targetClean && tClean === targetClean) return true;
+    const tAsin = (tracked.url || '').match(/\/(?:dp|gp\/product)\/([A-Za-z0-9]{10})/i)?.[1];
+    const targetAsin = (target.url || '').match(/\/(?:dp|gp\/product)\/([A-Za-z0-9]{10})/i)?.[1];
+    if (tAsin && targetAsin && tAsin.toUpperCase() === targetAsin.toUpperCase()) return true;
+    const tPid =
+      (tracked.url || '').match(/[?&]pid=([A-Za-z0-9]+)/i)?.[1] ||
+      (tracked.url || '').match(/\/p\/([a-zA-Z0-9]+)/i)?.[1];
+    const targetPid =
+      (target.url || '').match(/[?&]pid=([A-Za-z0-9]+)/i)?.[1] ||
+      (target.url || '').match(/\/p\/([a-zA-Z0-9]+)/i)?.[1];
+    if (tPid && targetPid && tPid.toUpperCase() === targetPid.toUpperCase()) return true;
+    return tracked.title === target.title && tracked.domain === target.domain;
+  };
   useEffect(() => {
     if (!product || trackedProducts.length === 0) {
       setIsTrackedCurrent(false);
       return;
     }
-    const found = trackedProducts.some(
-      (p) => p.url === product.url || (p.title === product.title && p.domain === product.domain)
-    );
+    const found = trackedProducts.some((p) => isMatchingProduct(p, product));
     setIsTrackedCurrent(found);
   }, [product, trackedProducts]);
 
@@ -490,9 +512,7 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
 
     if (isTrackedCurrent) {
       // Remove
-      const item = trackedProducts.find(
-        (p) => p.url === product.url || (p.title === product.title && p.domain === product.domain)
-      );
+      const item = trackedProducts.find((p) => isMatchingProduct(p, product));
       if (item) {
         const updated = await StorageService.removeTrackedProduct(item.id);
         setTrackedProducts(updated);
@@ -831,14 +851,14 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
                   )}
                 </div>
 
-                {/* Last Recorded Price Banner (when previously tracked) */}
+                {/* Last Recorded Price Banner (when previously tracked or cached) */}
                 {lastRecordedPrice !== null && (
                   <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 flex items-center justify-between text-xs font-mono">
-                    <span className="text-zinc-400 flex items-center space-x-1.5">
+                    <span className="text-zinc-400 flex items-center space-x-1.5 shrink-0">
                       <RotateCcw className="w-3.5 h-3.5 text-orange-400" />
                       <span>Last Checked Price:</span>
                     </span>
-                    <span className="font-bold text-white">
+                    <span className="font-bold text-white text-right">
                       {EcommerceAssistantService.formatPrice(lastRecordedPrice, product.currency)}
                       {product.currentPrice < lastRecordedPrice ? (
                         <span className="text-emerald-400 font-semibold ml-2">
@@ -849,7 +869,11 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
                           (↑ Rose by {product.currency}{Math.round((product.currentPrice - lastRecordedPrice) * 100) / 100})
                         </span>
                       ) : (
-                        <span className="text-zinc-400 font-normal ml-2">(Unchanged)</span>
+                        <span className="text-zinc-400 font-normal ml-2">
+                          {lastCheckedTimestamp && Date.now() - lastCheckedTimestamp > 60000
+                            ? `(Verified ${Math.round((Date.now() - lastCheckedTimestamp) / 3600000) > 0 ? `${Math.round((Date.now() - lastCheckedTimestamp) / 3600000)}h ago` : `${Math.round((Date.now() - lastCheckedTimestamp) / 60000)}m ago`})`
+                            : '(Unchanged)'}
+                        </span>
                       )}
                     </span>
                   </div>

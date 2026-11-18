@@ -106,6 +106,29 @@ describe('Smart Shopping Assistant Service Tests', () => {
       expect(hasLowestLabel).toBe(true);
       expect(hasHighestLabel).toBe(true);
     });
+
+    it('records same-day intraday price drops without overwriting previous baseline', () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const initial = [{ date: todayStr, price: 1000 }];
+      const updated = EcommerceAssistantService.getAuthenticPriceHistory(850, initial);
+      expect(updated.length).toBe(2);
+      expect(updated[0].price).toBe(1000);
+      expect(updated[1].price).toBe(850);
+      expect(updated[1].label).toBe('Lowest');
+      expect(updated[0].label).toBe('Highest');
+    });
+
+    it('persists and retrieves auto-cached price history across product visits', async () => {
+      const key = 'amazon.in_asin_B0CHX1W1XY';
+      const history = [{ date: '2026-11-18', price: 999 }];
+      await StorageService.saveCachedProductPrice(key, history, 999);
+
+      const cached = await StorageService.getCachedProductPrice(key);
+      expect(cached).not.toBeNull();
+      expect(cached?.lastPrice).toBe(999);
+      expect(cached?.history.length).toBe(1);
+      expect(cached?.lastChecked).toBeGreaterThan(0);
+    });
   });
 
   describe('Fake Review & Authenticity Detector', () => {

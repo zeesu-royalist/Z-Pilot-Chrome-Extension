@@ -1539,6 +1539,10 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
 
       // ── E-Commerce Product & Review Detection ──
       case 'DETECT_ECOMMERCE_PRODUCT': {
+        // Only the top-level main window should respond to product scans (ignore ad/sub-iframes)
+        if (window !== window.top) {
+          return false;
+        }
         try {
           const product = extractPageProductData();
           sendResponse({ ok: true, product });
@@ -1549,6 +1553,9 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       }
 
       case 'SCROLL_TO_REVIEWS': {
+        if (window !== window.top) {
+          return false;
+        }
         scrollToReviewsAndExtract()
           .then((product) => {
             sendResponse({ ok: true, product });
@@ -1560,6 +1567,9 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       }
 
       case 'EXTRACT_PAGE_COUPONS': {
+        if (window !== window.top) {
+          return false;
+        }
         try {
           const coupons = extractOnPageCoupons();
           sendResponse({ ok: true, coupons });
@@ -1570,7 +1580,7 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       }
 
       default:
-        sendResponse({ error: 'Unknown action type in page agent' });
+        // Do not call sendResponse here to avoid prematurely closing the message port for other handlers
         return false;
     }
   });
