@@ -24,6 +24,300 @@ interface ChatMessageProps {
   isExecutingAction?: boolean;
 }
 
+/**
+ * Code Block view with copy-to-clipboard functionality
+ */
+const CodeBlockView: React.FC<{ language?: string; code: string }> = ({ language, code }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="my-2 rounded-xl border border-white/10 bg-black/75 overflow-hidden shadow-inner">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/10 text-[10px] text-white/60">
+        <span className="font-mono uppercase font-semibold text-orange-400">
+          {language || 'code'}
+        </span>
+        <button
+          type="button"
+          onClick={handleCopyCode}
+          className="flex items-center space-x-1 hover:text-white transition-colors cursor-pointer"
+        >
+          {copied ? (
+            <>
+              <Check className="w-3 h-3 text-green-400" />
+              <span className="text-green-400">Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy className="w-3 h-3" />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="p-3 overflow-x-auto text-[11px] font-mono leading-relaxed text-orange-100/95 scrollbar-thin">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+/**
+ * Parses inline markdown tokens: bold, italic, code, links, and strips stray asterisks
+ */
+export function parseInlineMarkdown(text: string, isUser = false): React.ReactNode[] {
+  if (!text) return [];
+
+  // Match:
+  // 1. Markdown link: [text](url)
+  // 2. Bare URL: https://...
+  // 3. Inline code: `code`
+  // 4. Bold + Italic: ***text***
+  // 5. Bold: **text** or __text__
+  // 6. Italic: *text* or _text_
+  const tokenRegex = /(\[[^\]]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s<]+[^<.,:;"')\]\s]|`[^`]+`|\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/g;
+
+  const parts = text.split(tokenRegex).filter(Boolean);
+
+  return parts.map((part, idx) => {
+    if (!part) return null;
+
+    // Markdown link: [text](url)
+    const linkMatch = part.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+    if (linkMatch) {
+      return (
+        <a
+          key={idx}
+          href={linkMatch[2]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={
+            isUser
+              ? 'underline underline-offset-2 text-white font-medium break-all'
+              : 'text-amber-400 hover:text-amber-300 underline underline-offset-2 break-all transition-colors cursor-pointer'
+          }
+        >
+          {linkMatch[1]}
+        </a>
+      );
+    }
+
+    // Bare URL: https://...
+    if (/^https?:\/\//i.test(part)) {
+      return (
+        <a
+          key={idx}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={
+            isUser
+              ? 'underline underline-offset-2 text-white font-medium break-all'
+              : 'text-amber-400 hover:text-amber-300 underline underline-offset-2 break-all transition-colors cursor-pointer'
+          }
+        >
+          {part}
+        </a>
+      );
+    }
+
+    // Inline code: `code`
+    if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+      return (
+        <code
+          key={idx}
+          className={`px-1.5 py-0.5 mx-0.5 rounded font-mono text-[11px] border ${
+            isUser
+              ? 'bg-black/25 text-white border-white/20'
+              : 'bg-white/10 text-orange-300 border-white/10'
+          }`}
+        >
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+
+    // Bold + Italic: ***text***
+    if (part.startsWith('***') && part.endsWith('***') && part.length >= 6) {
+      return (
+        <strong key={idx} className="font-bold italic text-white">
+          {part.slice(3, -3)}
+        </strong>
+      );
+    }
+
+    // Bold: **text**
+    if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+      return (
+        <strong key={idx} className="font-semibold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    // Bold: __text__
+    if (part.startsWith('__') && part.endsWith('__') && part.length >= 4) {
+      return (
+        <strong key={idx} className="font-semibold text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    // Italic: *text*
+    if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+      return (
+        <em key={idx} className="italic text-white/90">
+          {part.slice(1, -1)}
+        </em>
+      );
+    }
+
+    // Italic: _text_
+    if (part.startsWith('_') && part.endsWith('_') && part.length >= 2) {
+      return (
+        <em key={idx} className="italic text-white/90">
+          {part.slice(1, -1)}
+        </em>
+      );
+    }
+
+    // Plain text segment: strip any leftover stray unclosed '**' so raw stars never appear!
+    const sanitized = part.replace(/\*\*/g, '');
+    return sanitized;
+  });
+}
+
+/**
+ * Rich Markdown formatter: parses headers, bullet points, numbered lists, blockquotes, code blocks
+ */
+export const MarkdownMessageView: React.FC<{ content: string; isUser?: boolean }> = ({
+  content,
+  isUser = false,
+}) => {
+  if (!content) return null;
+
+  // Separate fenced code blocks from regular text blocks
+  const codeBlockRegex = /```([a-zA-Z0-9_-]*)\r?\n([\s\S]*?)```/g;
+  const elements: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  const renderTextSection = (section: string, baseKey: string | number) => {
+    const lines = section.split(/\r?\n/);
+    return lines.map((line, lineIdx) => {
+      const key = `${baseKey}-l-${lineIdx}`;
+
+      // Empty line / paragraph break
+      if (line.trim() === '') {
+        return <div key={key} className="h-1.5" />;
+      }
+
+      // Horizontal separator
+      if (/^(\-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+        return <hr key={key} className="my-2 border-white/10" />;
+      }
+
+      // Headings
+      if (line.startsWith('### ')) {
+        return (
+          <h4 key={key} className="text-xs font-bold text-orange-300 mt-2.5 mb-1 tracking-tight">
+            {parseInlineMarkdown(line.slice(4).trim(), isUser)}
+          </h4>
+        );
+      }
+      if (line.startsWith('## ')) {
+        return (
+          <h3 key={key} className="text-xs font-extrabold text-orange-400 mt-3 mb-1 tracking-tight">
+            {parseInlineMarkdown(line.slice(3).trim(), isUser)}
+          </h3>
+        );
+      }
+      if (line.startsWith('# ')) {
+        return (
+          <h2 key={key} className="text-sm font-extrabold text-orange-400 mt-3.5 mb-1.5 tracking-tight">
+            {parseInlineMarkdown(line.slice(2).trim(), isUser)}
+          </h2>
+        );
+      }
+
+      // Blockquote
+      if (line.startsWith('> ')) {
+        return (
+          <blockquote
+            key={key}
+            className="border-l-2 border-orange-500/50 pl-2.5 my-1 text-white/80 italic text-[11px]"
+          >
+            {parseInlineMarkdown(line.slice(2), isUser)}
+          </blockquote>
+        );
+      }
+
+      // Bullet points (-, *, +, •)
+      const bulletMatch = line.match(/^[\*\-\+•]\s+(.*)$/);
+      if (bulletMatch) {
+        return (
+          <div key={key} className="flex items-start space-x-2 my-0.5 pl-1">
+            <span className="text-orange-400 text-xs shrink-0 select-none leading-relaxed">•</span>
+            <div className="flex-1 leading-relaxed">
+              {parseInlineMarkdown(bulletMatch[1], isUser)}
+            </div>
+          </div>
+        );
+      }
+
+      // Numbered lists (1., 2., etc.)
+      const numberMatch = line.match(/^(\d+)[\.\)]\s+(.*)$/);
+      if (numberMatch) {
+        return (
+          <div key={key} className="flex items-start space-x-2 my-0.5 pl-1">
+            <span className="text-orange-300/90 font-mono text-[11px] font-semibold shrink-0 select-none leading-relaxed">
+              {numberMatch[1]}.
+            </span>
+            <div className="flex-1 leading-relaxed">
+              {parseInlineMarkdown(numberMatch[2], isUser)}
+            </div>
+          </div>
+        );
+      }
+
+      // Normal text line
+      return (
+        <div key={key} className="leading-relaxed my-0.5">
+          {parseInlineMarkdown(line, isUser)}
+        </div>
+      );
+    });
+  };
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      const textChunk = content.slice(lastIndex, match.index);
+      elements.push(
+        <div key={`text-${lastIndex}`}>{renderTextSection(textChunk, lastIndex)}</div>
+      );
+    }
+    const lang = match[1]?.trim() || '';
+    const code = match[2] || '';
+    elements.push(<CodeBlockView key={`code-${match.index}`} language={lang} code={code} />);
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    const textChunk = content.slice(lastIndex);
+    elements.push(
+      <div key={`text-${lastIndex}`}>{renderTextSection(textChunk, lastIndex)}</div>
+    );
+  }
+
+  return <div className="space-y-0.5 break-words">{elements}</div>;
+};
+
 export const ChatMessage: React.FC<ChatMessageProps> = ({
   message,
   activeUrl,
@@ -116,9 +410,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                 : 'bg-black/60 border-white/10 text-white/95 rounded-tl-sm shadow-xl shadow-black/50 backdrop-blur-md'
             }`}
           >
-            {/* Message Text */}
-            <div className="whitespace-pre-wrap break-words leading-relaxed">
-              {message.content}
+            {/* Message Text with Markdown Rendering */}
+            <div className="break-words leading-relaxed">
+              <MarkdownMessageView content={message.content} isUser={isUser} />
             </div>
 
             {/* Quick action buttons inside error bubble */}

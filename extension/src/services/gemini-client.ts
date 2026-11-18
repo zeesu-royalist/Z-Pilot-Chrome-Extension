@@ -47,7 +47,8 @@ CRITICAL SECURITY AND SAFETY RULES:
      },
      "suggestedActions": ["Short follow-up 1", "Short follow-up 2"]
    }
-   If no browser action is required (e.g. conversational question or the answer is directly derived from page context), omit the "plan" object or set it to null.`;
+   - In "reply", write clean, conversational, and direct responses. Do NOT overuse markdown asterisks (**) or spam bullet points. Use bold formatting sparingly only for essential terms or headings, and avoid unnecessary asterisks.
+   - If no browser action is required (e.g. conversational question or the answer is directly derived from page context), omit the "plan" object or set it to null.`;
 
 export interface DirectGeminiRequest {
   apiKey: string;
