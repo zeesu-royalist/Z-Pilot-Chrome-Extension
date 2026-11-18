@@ -719,40 +719,40 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
               <button
                 type="button"
                 onClick={() => handleTabChange('price_tracker')}
-                className={`py-2 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+                className={`py-2 px-1.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   activeTab === 'price_tracker'
                     ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md shadow-orange-600/30'
-                    : 'text-white/60 hover:text-white'
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <TrendingDown className="w-3.5 h-3.5" />
-                <span>Price History</span>
+                <TrendingDown className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Price History</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleTabChange('fake_reviews')}
-                className={`py-2 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+                className={`py-2 px-1.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   activeTab === 'fake_reviews'
                     ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md shadow-orange-600/30'
-                    : 'text-white/60 hover:text-white'
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Customer Reviews</span>
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Reviews</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleTabChange('coupons')}
-                className={`py-2 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+                className={`py-2 px-1.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer whitespace-nowrap active:scale-[0.98] ${
                   activeTab === 'coupons'
                     ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-md shadow-orange-600/30'
-                    : 'text-white/60 hover:text-white'
+                    : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <Tag className="w-3.5 h-3.5" />
-                <span>Coupons ({coupons.length})</span>
+                <Tag className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Coupons ({coupons.length})</span>
               </button>
             </div>
           </div>
