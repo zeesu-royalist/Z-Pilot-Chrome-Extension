@@ -19,22 +19,3 @@ export const BrandMark: React.FC<BrandMarkProps> = ({ className = '', size = 24 
     />
   );
 };
-
-interface FullLogoProps {
-  className?: string;
-  width?: number;
-}
-
-/**
- * The complete Z-Pilot logo with typography and "POWERED BY ZEESU ROYALIST"
- */
-export const FullLogo: React.FC<FullLogoProps> = ({ className = '', width = 160 }) => {
-  return (
-    <img
-      src="/logo.png"
-      alt="Z-Pilot - Powered by Zeesu Royalist"
-      style={{ width: `${width}px` }}
-      className={`object-contain ${className}`}
-    />
-  );
-};

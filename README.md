@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="extension/public/logo.png" width="420" alt="Z-Pilot AI Browser Agent" />
+  <img src="assets/logo.png" width="420" alt="Z-Pilot AI Browser Agent" />
 
   # ⚡ Z-Pilot
   ### *The Autonomous AI Browser Copilot & All-in-One Workspace*
@@ -12,7 +12,7 @@
 
   <!-- ── LIVE PRODUCT SHOWCASE / AD BANNER ── -->
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip" title="Download Free Z-Pilot Extension">
+    <a href="release/z-pilot-v2.4.0" title="Go to Z-Pilot Extension Folder">
       <img src="assets/z-pilot-live-showcase.jpg" width="100%" alt="Z-Pilot AI Browser Agent - Live LinkedIn Job Autofill & AI Copilot" style="max-width: 900px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 36px rgba(0,0,0,0.5);" />
     </a>
   </p>
@@ -21,8 +21,8 @@
   </p>
 
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
-      <img src="https://img.shields.io/badge/⬇️_FREE_DOWNLOAD-Z--Pilot_v2.4.0_(ZIP)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Download Z-Pilot ZIP" />
+    <a href="release/z-pilot-v2.4.0">
+      <img src="https://img.shields.io/badge/📂_GET_EXTENSION-release%2Fz--pilot--v2.4.0-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Open Z-Pilot v2.4.0 Folder" />
     </a>
   </p>
 
@@ -154,34 +154,17 @@ Instead of opening 10 different tabs or slowing down your computer with 8 separa
 
 ---
 
-## 🚀 Quick Install (Instant 1-Click Drag & Drop!)
+## 🚀 Quick Install (1-Click Drag & Drop!)
 
-No coding or terminal knowledge required. Choose the easiest option for you:
-
-### ⚡ Option A: Instant Drag & Drop (Zero Extracting Needed!)
-If you have cloned or downloaded this repository, the pre-built folder is already unpacked and ready to use:
+No terminal commands, no building, and **zero extracting needed**! The extension is already built and ready in the **[`release/z-pilot-v2.4.0`](release/z-pilot-v2.4.0)** folder:
 
 1. Open **`chrome://extensions`** in your browser.
    *(Using Brave? `brave://extensions` • Using Edge? `edge://extensions`)*
 2. In the top-right corner, **turn ON "Developer mode"**.
-3. **Drag & Drop** the folder **[`release/z-pilot-v2.4.0`](release/z-pilot-v2.4.0)** directly into your extensions page!
-4. Click the puzzle icon (🧩) and **Pin (📌) Z-Pilot** to your toolbar. 🎉 **Ready to use in 5 seconds!**
+3. Simply **Drag & Drop** the folder **[`release/z-pilot-v2.4.0`](release/z-pilot-v2.4.0)** directly into the extensions window (or click **"Load unpacked"** and select it).
+4. Click the browser puzzle icon (🧩) and **Pin (📌) Z-Pilot** to your toolbar.
 
----
-
-### 📦 Option B: 1-Click Download Bundle
-Prefer a single file download? Click the direct bundle link below:
-
-<p>
-  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
-    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.4.0.zip-ea580c?style=flat-square&logo=googlechrome&logoColor=white" height="34" alt="Download ZIP" />
-  </a>
-</p>
-
-1. Download the ZIP file above (macOS Safari automatically unpacks it directly to your Downloads folder).
-2. Open **`chrome://extensions`** and toggle **"Developer mode"** ON.
-3. Click **"Load unpacked"** and select the folder, or simply drag & drop the unzipped folder into your browser window.
-4. Pin (📌) Z-Pilot and start browsing with superpowers!
+🎉 **Done! Click the Z-Pilot icon to open your AI browser side panel.**
 
 ---
 
@@ -232,8 +215,8 @@ Google Chrome, Brave, Microsoft Edge, Opera, Vivaldi, and any Chromium-based bro
   ### 🌟 Ready to upgrade your browser?
 
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
-      <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-FREE_DOWNLOAD-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started" />
+    <a href="release/z-pilot-v2.4.0">
+      <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-LOAD_EXTENSION-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started" />
     </a>
   </p>
 
