@@ -2,6 +2,8 @@ import {
   BrowserAction,
   PageContext,
   ActionResult,
+  UserProfile,
+  AutofillResult,
 } from '../types/index.js';
 import { VideoScannerService } from './video-scanner.js';
 
@@ -58,10 +60,10 @@ export const BrowserActionService = {
       });
       if (res && res.status === 'ok') return true;
     } catch {
-      // Not yet injected, attempt dynamic injection
+      // Not yet injected, attempt dynamic injection across all frames
       try {
         await chrome.scripting.executeScript({
-          target: { tabId },
+          target: { tabId, allFrames: true },
           files: ['content.js'],
         });
         // Small delay for script initialization
@@ -386,5 +388,125 @@ export const BrowserActionService = {
         message: (err as Error).message || 'Action failed unexpectedly',
       };
     }
+  },
+
+  /**
+   * One-Click Form Autofill for Job Applications & Forms on active tab
+   */
+  async autofillPageForm(
+    profile: UserProfile,
+    options?: { overwriteExisting?: boolean; resumeOnly?: boolean; photoOnly?: boolean }
+  ): Promise<AutofillResult> {
+    const tab = await this.getActiveTab();
+    if (!tab || !tab.id) {
+      return {
+        success: false,
+        filledCount: 0,
+        totalScanned: 0,
+        filledDetails: [],
+        failedFields: [{ name: 'page', reason: 'No active tab found' }],
+      };
+    }
+
+    if (isRestrictedUrl(tab.url)) {
+      return {
+        success: false,
+        filledCount: 0,
+        totalScanned: 0,
+        filledDetails: [],
+        failedFields: [
+          {
+            name: 'page',
+            reason: 'Browser internal pages (chrome://) cannot be autofilled',
+          },
+        ],
+      };
+    }
+
+    await this.ensureContentScript(tab.id, tab.url);
+
+    // 1. Try multi-frame execution to support embedded ATS portals (Greenhouse, Lever, Ashby, Workday iframes)
+    try {
+      if (typeof chrome !== 'undefined' && chrome.scripting && chrome.scripting.executeScript) {
+        const frameExecutions = await chrome.scripting.executeScript({
+          target: { tabId: tab.id, allFrames: true },
+          func: (prof: any, opt: any) => {
+            const runner = (window as any).__zPilotAutofill;
+            if (typeof runner === 'function') {
+              return runner(prof, opt);
+            }
+            return null;
+          },
+          args: [profile, options],
+        });
+
+        const validResults = (frameExecutions || [])
+          .map((fe) => fe.result)
+          .filter((res): res is AutofillResult => !!res && typeof res === 'object');
+
+        if (validResults.length > 0) {
+          const successfulFrames = validResults.filter((r) => r.success && r.filledCount > 0);
+          if (successfulFrames.length > 0) {
+            const totalFilled = successfulFrames.reduce((acc, r) => acc + (r.filledCount || 0), 0);
+            const totalScanned = validResults.reduce((acc, r) => acc + (r.totalScanned || 0), 0);
+            const allDetails = successfulFrames.flatMap((r) => r.filledDetails || []);
+            const allFailed = successfulFrames.flatMap((r) => r.failedFields || []);
+            return {
+              success: true,
+              filledCount: totalFilled,
+              totalScanned,
+              filledDetails: allDetails,
+              failedFields: allFailed,
+            };
+          }
+
+          // If no frame succeeded, return the frame with highest scanned count or first failure reason
+          const bestCandidate = validResults.sort(
+            (a, b) => (b.totalScanned || 0) - (a.totalScanned || 0)
+          )[0];
+          if (bestCandidate && (bestCandidate.totalScanned > 0 || (bestCandidate.failedFields && bestCandidate.failedFields.length > 0))) {
+            return bestCandidate;
+          }
+        }
+      }
+    } catch (multiFrameErr) {
+      console.warn('[BrowserActions] Multi-frame execution fallback to sendMessage:', multiFrameErr);
+    }
+
+    // 2. Fallback to standard top-level message passing
+    return new Promise((resolve) => {
+      chrome.tabs.sendMessage(
+        tab.id!,
+        { type: 'AUTOFILL_JOB_FORM', profile, options },
+        (response: AutofillResult) => {
+          if (chrome.runtime.lastError) {
+            resolve({
+              success: false,
+              filledCount: 0,
+              totalScanned: 0,
+              filledDetails: [],
+              failedFields: [
+                {
+                  name: 'runtime',
+                  reason:
+                    chrome.runtime.lastError.message ||
+                    'Script communication failed. Please refresh the page and try again.',
+                },
+              ],
+            });
+          } else {
+            resolve(
+              response || {
+                success: false,
+                filledCount: 0,
+                totalScanned: 0,
+                filledDetails: [],
+                failedFields: [],
+              }
+            );
+          }
+        }
+      );
+    });
   },
 };

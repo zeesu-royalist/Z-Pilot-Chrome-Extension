@@ -47,31 +47,42 @@ describe('Smart Shopping Assistant Service Tests', () => {
 
   describe('Deal Score Evaluation', () => {
     it('identifies lowest recorded price as Great Deal', () => {
-      const deal = EcommerceAssistantService.evaluateDeal(50, 50, 100);
+      const deal = EcommerceAssistantService.evaluateDeal(50, 50, 100, 2);
       expect(deal.score).toBe('Great Deal');
       expect(deal.color).toContain('emerald');
     });
 
     it('identifies price below average as Great Deal', () => {
-      const deal = EcommerceAssistantService.evaluateDeal(60, 50, 100);
+      const deal = EcommerceAssistantService.evaluateDeal(60, 50, 100, 2);
       expect(deal.score).toBe('Great Deal');
     });
 
     it('identifies price near historical peak as High Price', () => {
-      const deal = EcommerceAssistantService.evaluateDeal(98, 50, 100);
+      const deal = EcommerceAssistantService.evaluateDeal(98, 50, 100, 2);
       expect(deal.score).toBe('High Price');
-      expect(deal.advice).toContain('price alert');
+      expect(deal.advice).toContain('alert');
+    });
+
+    it('identifies initial observation as Current Price with zero fabrication', () => {
+      const deal = EcommerceAssistantService.evaluateDeal(75, 75, 75, 1);
+      expect(deal.score).toBe('Current Price');
+      expect(deal.advice).toContain('1st recorded price');
     });
   });
 
-  describe('90-Day Price Trend Generator', () => {
-    it('generates consistent historical points with Lowest & Highest labels', () => {
-      const history = EcommerceAssistantService.generatePriceHistory(100);
-      expect(history.length).toBeGreaterThan(5);
+  describe('Authentic Price History Tracking', () => {
+    it('records authentic initial point without fake past curves', () => {
+      const initial = EcommerceAssistantService.getAuthenticPriceHistory(100);
+      expect(initial.length).toBe(1);
+      expect(initial[0].price).toBe(100);
+      expect(initial[0].label).toBe('Current');
+    });
 
-      const prices = history.map((h) => h.price);
-      expect(Math.min(...prices)).toBeLessThan(100);
-      expect(Math.max(...prices)).toBeGreaterThan(100);
+    it('tracks genuine historical points with Lowest & Highest labels when recorded', () => {
+      const p1 = { date: '2026-11-01', price: 120, label: 'Highest' };
+      const p2 = { date: '2026-11-10', price: 80, label: 'Lowest' };
+      const history = EcommerceAssistantService.getAuthenticPriceHistory(95, [p1, p2]);
+      expect(history.length).toBe(3);
 
       const hasLowestLabel = history.some((h) => h.label === 'Lowest');
       const hasHighestLabel = history.some((h) => h.label === 'Highest');

@@ -110,30 +110,47 @@ export class EcommerceAssistantService {
   }
 
   /**
-   * Calculates Deal Grade & Percentage Difference relative to historical average
+   * Calculates Deal Grade & Percentage Difference relative to authentic recorded observations.
    */
-  public static evaluateDeal(currentPrice: number, lowestPrice: number, highestPrice: number): {
-    score: 'Great Deal' | 'Fair Price' | 'High Price';
+  public static evaluateDeal(
+    currentPrice: number,
+    lowestPrice: number,
+    highestPrice: number,
+    historyCount = 1
+  ): {
+    score: 'Great Deal' | 'Fair Price' | 'High Price' | 'Current Price';
     percentageFromLowest: number;
     color: string;
     advice: string;
   } {
     if (currentPrice <= 0 || highestPrice <= 0) {
       return {
-        score: 'Fair Price',
+        score: 'Current Price',
         percentageFromLowest: 0,
-        color: 'text-amber-400',
-        advice: 'Current market standard price.',
+        color: 'text-zinc-400',
+        advice: 'Current price observed.',
       };
     }
 
     const priceRange = highestPrice - lowestPrice;
-    if (priceRange <= 0 || currentPrice <= lowestPrice * 1.03) {
+    if (priceRange <= 0 || (historyCount <= 1 && lowestPrice === highestPrice)) {
+      return {
+        score: 'Current Price',
+        percentageFromLowest: 0,
+        color: 'text-orange-400',
+        advice: '1st recorded price check. Track this item to monitor future price drops.',
+      };
+    }
+
+    if (currentPrice <= lowestPrice * 1.02) {
+      const savings = Math.round(((highestPrice - currentPrice) / highestPrice) * 100);
       return {
         score: 'Great Deal',
         percentageFromLowest: 0,
         color: 'text-emerald-400',
-        advice: 'Lowest recorded price! Excellent time to buy.',
+        advice: savings > 0
+          ? `Lowest recorded price! Save ~${savings}% compared to recorded peak.`
+          : 'Lowest recorded price since tracking started!',
       };
     }
 
@@ -144,14 +161,14 @@ export class EcommerceAssistantService {
         score: 'Great Deal',
         percentageFromLowest: Math.round(((currentPrice - lowestPrice) / lowestPrice) * 100),
         color: 'text-emerald-400',
-        advice: `Priced below average — save ~${savings}% compared to peak.`,
+        advice: `Priced below average — save ~${savings}% compared to recorded peak.`,
       };
-    } else if (currentPrice <= highestPrice * 0.92) {
+    } else if (currentPrice <= highestPrice * 0.95) {
       return {
         score: 'Fair Price',
         percentageFromLowest: Math.round(((currentPrice - lowestPrice) / lowestPrice) * 100),
         color: 'text-orange-400',
-        advice: 'Average standard price. Consider waiting for a sale.',
+        advice: 'Standard price within recorded historical range.',
       };
     } else {
       const markup = Math.round(((currentPrice - lowestPrice) / lowestPrice) * 100);
@@ -159,72 +176,90 @@ export class EcommerceAssistantService {
         score: 'High Price',
         percentageFromLowest: markup,
         color: 'text-red-400',
-        advice: `Near peak historical price (${markup}% above lowest). We recommend setting a price alert!`,
+        advice: `Near peak recorded price (${markup}% above recorded lowest). We recommend setting an alert!`,
       };
     }
   }
 
   /**
-   * Generate realistic historical price curve points (90 days) for visual insights
+   * Authentic Price History Tracker
+   * Records genuine observations. Zero simulated or fabricated past curves.
+   */
+  public static getAuthenticPriceHistory(
+    currentPrice: number,
+    existingHistory?: PriceHistoryPoint[]
+  ): PriceHistoryPoint[] {
+    if (currentPrice <= 0) return [];
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if (existingHistory && existingHistory.length > 0) {
+      const history = [...existingHistory];
+      const lastIndex = history.length - 1;
+      const lastPoint = history[lastIndex];
+
+      if (lastPoint.date === todayStr) {
+        history[lastIndex] = { ...lastPoint, price: currentPrice };
+      } else {
+        history.push({ date: todayStr, price: currentPrice });
+      }
+
+      const prices = history.map((p) => p.price);
+      const minP = Math.min(...prices);
+      const maxP = Math.max(...prices);
+
+      return history.map((pt) => {
+        let label: string | undefined = undefined;
+        if (history.length > 1) {
+          if (pt.price === minP) label = 'Lowest';
+          else if (pt.price === maxP) label = 'Highest';
+        } else {
+          label = 'Current';
+        }
+        return { ...pt, label };
+      });
+    }
+
+    return [{ date: todayStr, price: currentPrice, label: 'Current' }];
+  }
+
+  /**
+   * Compatibility alias for getAuthenticPriceHistory
    */
   public static generatePriceHistory(
     currentPrice: number,
     existingHistory?: PriceHistoryPoint[]
   ): PriceHistoryPoint[] {
-    if (existingHistory && existingHistory.length >= 5) {
-      return existingHistory;
-    }
-
-    if (currentPrice <= 0) return [];
-
-    const history: PriceHistoryPoint[] = [];
-    const now = new Date();
-    const daysBack = 90;
-    const lowest = Math.round(currentPrice * 0.82 * 100) / 100;
-    const highest = Math.round(currentPrice * 1.25 * 100) / 100;
-
-    // Deterministic pseudo-random curve based on current price
-    const seed = Math.floor(currentPrice);
-
-    for (let i = daysBack; i >= 0; i -= 10) {
-      const d = new Date(now.getTime() - i * 86400000);
-      const dateStr = d.toISOString().split('T')[0];
-
-      let priceVal = currentPrice;
-      if (i === 0) {
-        priceVal = currentPrice;
-      } else if (i === 40) {
-        priceVal = lowest; // simulate a past sale event
-      } else if (i === 70) {
-        priceVal = highest;
-      } else {
-        const varianceFactor = 0.9 + (((seed * i * 37) % 25) / 100);
-        priceVal = Math.round(currentPrice * varianceFactor * 100) / 100;
-      }
-
-      let label: string | undefined = undefined;
-      if (priceVal === lowest) label = 'Lowest';
-      if (priceVal === highest) label = 'Highest';
-
-      history.push({
-        date: dateStr,
-        price: priceVal,
-        label,
-      });
-    }
-
-    return history;
+    return this.getAuthenticPriceHistory(currentPrice, existingHistory);
   }
 
   /**
-   * Fast & Reliable Heuristic Fake Review Authenticity Detector
-   * Calculates a Trust Grade (A-F), Adjusted Rating, and detects red flag patterns.
+   * Fast & Reliable Authentic Fake Review Detector
+   * Analyzes ONLY reviews genuinely present on the webpage.
+   * If zero reviews exist in page DOM, returns totalAnalyzed: 0 with zero dummy fallback text.
    */
   public static analyzeReviewsHeuristic(
     reviews: string[] = [],
     originalRating = 4.5,
-    reviewCount = 120
+    reviewCount = 0
   ): FakeReviewAnalysis {
+    if (!reviews || reviews.length === 0) {
+      return {
+        trustGrade: 'N/A',
+        trustScore: 0,
+        originalRating,
+        adjustedRating: originalRating,
+        suspiciousCount: 0,
+        totalAnalyzed: 0,
+        verdict: 'No Reviews Detected',
+        summary: 'No customer reviews were detected in the visible page DOM. Scroll down to the Customer Reviews section on this webpage, then click Refresh.',
+        pros: [],
+        cons: [],
+        redFlags: ['No review text detected in page DOM'],
+        metrics: [],
+      };
+    }
+
     let trustScore = 85;
     const redFlags: string[] = [];
     const pros: string[] = [];
@@ -241,14 +276,7 @@ export class EcommerceAssistantService {
     let flawMatches = 0;
     let genuinePraiseMatches = 0;
 
-    const sampleTexts = reviews.length > 0 ? reviews : [
-      "The build quality is very solid and battery lasts through the whole workday without issue.",
-      "Good for the price, but the plastic latch feels a bit flimsy if handled roughly.",
-      "Works as expected out of the box. Delivery was on time.",
-      "Customer support helped with setup immediately.",
-    ];
-
-    sampleTexts.forEach((text) => {
+    reviews.forEach((text) => {
       if (genericPraiseRegex.test(text)) genericPraiseMatches++;
       if (suspiciousIncentiveRegex.test(text)) incentivizedMatches++;
       if (genuineFlawRegex.test(text)) flawMatches++;
@@ -256,26 +284,26 @@ export class EcommerceAssistantService {
     });
 
     // Metric 1: Repetitive / Low-effort praise
-    const praiseRatio = genericPraiseMatches / Math.max(1, sampleTexts.length);
+    const praiseRatio = genericPraiseMatches / reviews.length;
     if (praiseRatio > 0.45) {
-      trustScore -= 22;
+      trustScore -= 25;
       redFlags.push('High concentration of repetitive short praise with generic buzzwords');
     }
 
     // Metric 2: Sponsored / Incentivized markers
     if (incentivizedMatches > 0) {
-      trustScore -= 18;
+      trustScore -= 20;
       redFlags.push('Detected compensated or promotional review language');
     }
 
     // Metric 3: Rating Distribution Anomaly
-    if (originalRating >= 4.8 && reviewCount > 500 && flawMatches === 0) {
+    if (originalRating >= 4.8 && reviewCount > 500 && flawMatches === 0 && reviews.length >= 5) {
       trustScore -= 15;
       redFlags.push('Suspiciously flawless 4.9+ rating distribution with unnatural low variance');
     }
 
     // Metric 4: Short reviews skew
-    const avgWords = sampleTexts.reduce((acc, t) => acc + t.split(/\s+/).length, 0) / Math.max(1, sampleTexts.length);
+    const avgWords = reviews.reduce((acc, t) => acc + t.split(/\s+/).length, 0) / reviews.length;
     if (avgWords < 8) {
       trustScore -= 12;
       redFlags.push('Unusually high proportion of 1-line one-word reviews');
@@ -284,7 +312,7 @@ export class EcommerceAssistantService {
     trustScore = Math.max(25, Math.min(98, trustScore));
 
     // Determine Grade & Verdict
-    let trustGrade: 'A' | 'B' | 'C' | 'D' | 'F' = 'A';
+    let trustGrade: 'A' | 'B' | 'C' | 'D' | 'F' | 'N/A' = 'A';
     let verdict: FakeReviewAnalysis['verdict'] = 'Genuine & Reliable';
 
     if (trustScore >= 80) {
@@ -312,19 +340,25 @@ export class EcommerceAssistantService {
     );
 
     // Extract Pros & Cons
-    if (genuinePraiseMatches > 0 || sampleTexts.length > 0) {
-      pros.push('Solid real-world build quality reported by verified buyers');
-      pros.push('Matches listed specs and performs well for daily use');
+    if (genuinePraiseMatches > 0) {
+      pros.push('Solid real-world build quality reported by buyers');
     }
     if (flawMatches > 0) {
-      cons.push('A few buyers noted minor durability or long-term wear concerns');
-    } else if (originalRating < 4.2) {
-      cons.push('Some users felt quality didn’t match retail price tag');
-    } else {
-      cons.push('No critical product defects flagged by buyers');
+      cons.push('Multiple buyers flagged durability, battery, or performance issues');
+    }
+    if (pros.length === 0 && reviews.length > 0) {
+      pros.push('General positive user sentiment in visible reviews');
+    }
+    if (cons.length === 0) {
+      cons.push('No severe product defects flagged in visible reviews');
     }
 
-    const suspiciousCount = Math.round(sampleTexts.length * ((100 - trustScore) / 120));
+    const suspiciousCount = Math.round(reviews.length * ((100 - trustScore) / 120));
+
+    // Gather 2-3 genuine excerpt quotes from visible reviews for visual proof
+    const sampleQuotes: string[] = reviews
+      .slice(0, 3)
+      .map((r) => (r.length > 130 ? r.slice(0, 127) + '...' : r));
 
     return {
       trustGrade,
@@ -332,21 +366,22 @@ export class EcommerceAssistantService {
       originalRating,
       adjustedRating,
       suspiciousCount,
-      totalAnalyzed: Math.max(sampleTexts.length, reviewCount),
+      totalAnalyzed: reviews.length,
       verdict,
       summary:
         trustScore >= 75
-          ? 'Reviews appear largely organic and authentic with specific buyer feedback.'
-          : 'Multiple automated or boilerplate reviews detected. Adjusted rating reflects verified purchaser feedback.',
+          ? `Analyzed ${reviews.length} visible reviews. Feedback appears largely organic and authentic.`
+          : `Analyzed ${reviews.length} visible reviews. Multiple boilerplate or promotional patterns detected.`,
       pros,
       cons,
       redFlags: redFlags.length > 0 ? redFlags : ['No unnatural review clusters detected'],
+      sampleQuotes,
       metrics: [
         {
           name: 'Reviewer Authenticity',
           score: Math.min(100, trustScore + 5),
           status: trustScore >= 75 ? 'safe' : trustScore >= 55 ? 'warning' : 'danger',
-          detail: 'Verified purchase ratios & profile history',
+          detail: 'Verified purchase patterns in visible text',
         },
         {
           name: 'Sentiment Naturalness',
@@ -355,10 +390,10 @@ export class EcommerceAssistantService {
           detail: 'Linguistic patterns & emotional balance',
         },
         {
-          name: 'Rating Velocity',
+          name: 'Rating Consistency',
           score: trustScore >= 75 ? 90 : 58,
           status: trustScore >= 75 ? 'safe' : 'warning',
-          detail: 'Steady review rate without sudden bursts',
+          detail: 'Review text alignment with star score',
         },
       ],
     };
@@ -468,39 +503,16 @@ Output strict JSON with this format:
       }
     });
 
-    // If still empty, supply universal shopping codes
-    if (map.size === 0) {
-      map.set('SAVE10', {
-        code: 'SAVE10',
-        discount: '10% OFF',
-        description: 'Universal online checkout promotional discount',
-        store: domain || 'Online Store',
-        verified: true,
-        successRate: 85,
-        source: 'store_database',
-      });
-      map.set('FREESHIP', {
-        code: 'FREESHIP',
-        discount: 'Free Shipping',
-        description: 'Standard zero cost ground shipping voucher',
-        store: domain || 'Online Store',
-        verified: true,
-        successRate: 92,
-        source: 'store_database',
-      });
-    }
-
+    // Authentic: Return only verified page found or recognized retailer database codes.
+    // Zero fabricated universal placeholder codes.
     return Array.from(map.values());
   }
 
   /**
-   * Create a TrackedProduct record from current product info
+   * Create a TrackedProduct record from current product info with authentic initial observation
    */
   public static createTrackedProduct(product: ProductInfo, targetPrice?: number): TrackedProduct {
-    const history = this.generatePriceHistory(product.currentPrice);
-    const prices = history.map((h) => h.price);
-    const lowestPrice = Math.min(...prices, product.currentPrice);
-    const highestPrice = Math.max(...prices, product.currentPrice);
+    const history = this.getAuthenticPriceHistory(product.currentPrice);
 
     return {
       id: `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -512,8 +524,8 @@ Output strict JSON with this format:
       initialPrice: product.currentPrice,
       currentPrice: product.currentPrice,
       targetPrice: targetPrice || Math.round(product.currentPrice * 0.9 * 100) / 100,
-      lowestPrice,
-      highestPrice,
+      lowestPrice: product.currentPrice,
+      highestPrice: product.currentPrice,
       history,
       dateAdded: Date.now(),
       lastChecked: Date.now(),

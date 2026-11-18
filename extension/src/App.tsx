@@ -717,6 +717,7 @@ export const App: React.FC = () => {
         unreadChatCount={unreadChatCount}
         onOpenAdBlocker={() => setIsAdBlockerOpen(true)}
         blockedAdsCount={blockedAdsCount}
+        onOpenAutofillProfile={() => setIsProfileOpen(true)}
         hasMessages={messages.length > 0}
       />
 
@@ -746,6 +747,8 @@ export const App: React.FC = () => {
             onOpenClipboard={() => setIsClipboardOpen(true)}
             onOpenClipBot={() => setIsClipboardOpen(true)}
             clipsCount={clipsCount}
+            onOpenAutofillProfile={() => setIsProfileOpen(true)}
+            userProfile={profile}
             onOpenChat={() => {
               setIsChatOpen(true);
               friendChatManager.setPanelOpen(true);
@@ -909,10 +912,7 @@ export const App: React.FC = () => {
       <ProfileModal
         profile={profile}
         isOpen={isProfileOpen}
-        onClose={() => {
-          setIsProfileOpen(false);
-          setIsSettingsOpen(true);
-        }}
+        onClose={() => setIsProfileOpen(false)}
         onSave={handleSaveProfile}
       />
     </div>

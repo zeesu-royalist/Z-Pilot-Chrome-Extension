@@ -96,18 +96,103 @@ export interface ChatMessage {
   };
 }
 
+export interface CustomFormQA {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface AutofillResult {
+  success: boolean;
+  filledCount: number;
+  totalScanned: number;
+  filledDetails: Array<{
+    label: string;
+    fieldName: string;
+    valueSnippet: string;
+  }>;
+  failedFields: Array<{ name: string; reason: string }>;
+}
+
+export interface UserResumeFile {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  base64Data: string;
+  uploadedAt: number;
+}
+
+export interface UserPhotoFile {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  base64Data: string;
+  uploadedAt: number;
+}
+
 export interface UserProfile {
+  // Contact & Personal
   fullName?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
   phone?: string;
   address?: string;
   city?: string;
+  state?: string;
   zipCode?: string;
   country?: string;
+
+  // Social & Portfolios
+  website?: string;
+  portfolioUrl?: string;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  twitterUrl?: string;
+  otherUrl?: string;
+
+  // Work Experience & Job Details
   company?: string;
   jobTitle?: string;
-  website?: string;
-  [key: string]: string | undefined;
+  totalExperience?: string; // e.g. "4 years", "3.5"
+  noticePeriod?: string; // e.g. "Immediate", "15 days", "30 days"
+  currentSalary?: string; // e.g. "$95,000" or "₹12 LPA"
+  expectedSalary?: string; // e.g. "$120,000" or "₹16 LPA"
+  preferredWorkMode?: string; // "Remote" | "Hybrid" | "On-site" | "Flexible"
+  startDate?: string; // e.g. "Immediate" or "2026-12-01"
+
+  // Education
+  degree?: string; // e.g. "Bachelor of Technology", "Master of Science"
+  fieldOfStudy?: string; // Major / Branch e.g. "Computer Science"
+  university?: string; // College / Institute Name
+  graduationYear?: string; // e.g. "2023"
+  gpa?: string; // e.g. "8.8 / 10" or "3.9 / 4.0"
+
+  // Skills & Written Pitch
+  skills?: string; // Comma separated skills e.g. "React, TypeScript, Python"
+  summary?: string; // Professional summary / Bio
+  coverLetter?: string; // Default cover letter / Why hire me / Note to recruiter
+
+  // Work Authorization & Legal
+  workAuthorization?: string; // "Yes" | "No"
+  visaSponsorship?: string; // "No" | "Yes"
+  willingToRelocate?: string; // "Yes" | "No" | "Remote Only"
+
+  // Equal Opportunity & Demographics (Optional)
+  gender?: string;
+  veteranStatus?: string;
+  disabilityStatus?: string;
+
+  // Custom Job Questions / JD-Specific Q&A Pairs
+  customQuestions?: CustomFormQA[];
+
+  // Resume / CV Document (Base64 stored locally)
+  resume?: UserResumeFile;
+
+  // Passport Size Photo (Base64 stored locally)
+  photo?: UserPhotoFile;
+
+  [key: string]: any;
 }
 
 export interface UserSettings {
@@ -502,17 +587,18 @@ export interface FakeReviewMetric {
 }
 
 export interface FakeReviewAnalysis {
-  trustGrade: 'A' | 'B' | 'C' | 'D' | 'F';
+  trustGrade: 'A' | 'B' | 'C' | 'D' | 'F' | 'N/A';
   trustScore: number; // 0 - 100
   originalRating: number;
   adjustedRating: number;
   suspiciousCount: number;
   totalAnalyzed: number;
-  verdict: 'Genuine & Reliable' | 'Moderate Concern' | 'High Risk / Likely Inauthentic';
+  verdict: 'Genuine & Reliable' | 'Moderate Concern' | 'High Risk / Likely Inauthentic' | 'No Reviews Detected';
   summary: string;
   pros: string[];
   cons: string[];
   redFlags: string[];
+  sampleQuotes?: string[];
   metrics: FakeReviewMetric[];
 }
 

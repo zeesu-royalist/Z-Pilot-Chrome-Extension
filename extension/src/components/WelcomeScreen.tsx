@@ -27,6 +27,9 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 import { GeminiClient, sanitizeApiKey } from '../services/gemini-client.js';
+import { UserProfile } from '../types/index.js';
+import { AutofillService } from '../services/autofill-service.js';
+import { BrowserActionService } from '../services/browser-actions.js';
 
 interface WelcomeScreenProps {
   onSelectPrompt: (prompt: string) => void;
@@ -55,6 +58,8 @@ interface WelcomeScreenProps {
   unreadChatCount?: number;
   onOpenAdBlocker?: () => void;
   blockedAdsCount?: number;
+  onOpenAutofillProfile?: () => void;
+  userProfile?: UserProfile;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -84,12 +89,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   unreadChatCount = 0,
   onOpenAdBlocker,
   blockedAdsCount = 0,
+  onOpenAutofillProfile,
+  userProfile,
 }) => {
   const [inputKey, setInputKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
   const [showQuickGuide, setShowQuickGuide] = useState(false);
+  const [autofillToast, setAutofillToast] = useState<{
+    type: 'loading' | 'success' | 'info' | 'error';
+    message: string;
+    details?: string[];
+  } | null>(null);
 
   const handleQuickConnect = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -116,6 +128,57 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     }
   };
 
+  const handleAutofillFormCardClick = async () => {
+    const filledCount = userProfile ? AutofillService.getFilledCount(userProfile) : 0;
+    if (!userProfile || filledCount === 0) {
+      // Profile empty -> open data entry window (ProfileModal)
+      if (onOpenAutofillProfile) {
+        onOpenAutofillProfile();
+      }
+      return;
+    }
+
+    // Profile has data -> directly trigger 1-click form autofill on active page
+    setAutofillToast({
+      type: 'loading',
+      message: '⚡ Scanning and filling forms on active page...',
+    });
+
+    try {
+      const res = await BrowserActionService.autofillPageForm(userProfile, {
+        overwriteExisting: false,
+      });
+
+      if (res.success && res.filledCount > 0) {
+        const fieldNames = res.filledDetails.map((d) => d.fieldName).slice(0, 5);
+        setAutofillToast({
+          type: 'success',
+          message: `✓ Successfully filled ${res.filledCount} field(s) on this page!`,
+          details: fieldNames,
+        });
+      } else if (res.totalScanned > 0) {
+        setAutofillToast({
+          type: 'info',
+          message: `Found ${res.totalScanned} inputs, but existing fields already had data or no matching profile fields.`,
+        });
+      } else {
+        setAutofillToast({
+          type: 'info',
+          message: 'No fillable form inputs found on this page.',
+        });
+      }
+    } catch (err: unknown) {
+      setAutofillToast({
+        type: 'error',
+        message: (err as Error).message || 'Failed to communicate with webpage script.',
+      });
+    }
+
+    setTimeout(() => {
+      setAutofillToast(null);
+    }, 4500);
+  };
+
   const [homeInput, setHomeInput] = useState('');
 
   const promptCards = [
@@ -128,6 +191,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       title: 'Autofill page forms',
       icon: FormInput,
       prompt: 'Inspect any input forms on this page and help me autofill them with my saved profile.',
+      onClick: handleAutofillFormCardClick,
     },
     {
       title: 'Explain this website',
@@ -443,13 +507,58 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
               Suggested Actions
             </span>
           </div>
+
+          {/* Live Autofill Toast on Main Screen */}
+          {autofillToast && (
+            <div
+              className={`mb-2.5 p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all animate-fade-in ${
+                autofillToast.type === 'success'
+                  ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                  : autofillToast.type === 'loading'
+                  ? 'bg-orange-950/40 border-orange-500/40 text-orange-200'
+                  : autofillToast.type === 'error'
+                  ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                  : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                {autofillToast.type === 'loading' && (
+                  <div className="w-3.5 h-3.5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                )}
+                {autofillToast.type === 'success' && (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                )}
+                {autofillToast.type === 'error' && (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                )}
+                {autofillToast.type === 'info' && (
+                  <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                )}
+                <div>
+                  <div className="font-medium">{autofillToast.message}</div>
+                  {autofillToast.details && autofillToast.details.length > 0 && (
+                    <div className="text-[10px] text-emerald-300/80 mt-0.5">
+                      Filled: {autofillToast.details.join(', ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setAutofillToast(null)}
+                className="text-white/40 hover:text-white text-xs ml-2 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
             {promptCards.map((card, idx) => {
               const IconComponent = card.icon;
               return (
                 <button
                   key={idx}
-                  onClick={() => onSelectPrompt(card.prompt)}
+                  onClick={() => (card.onClick ? card.onClick() : onSelectPrompt(card.prompt))}
                   className="p-3 sm:p-3.5 rounded-2xl bg-black/20 hover:bg-black/35 border border-white/15 hover:border-white/30 text-left transition-all group cursor-pointer shadow-sm backdrop-blur-md flex flex-col justify-between min-h-[88px] sm:min-h-[92px] active:scale-[0.98] focus:outline-none"
                 >
                   <div className="w-8 h-8 rounded-xl bg-orange-500/20 border border-orange-400/35 flex items-center justify-center text-orange-200 group-hover:text-white transition-all shadow-inner">

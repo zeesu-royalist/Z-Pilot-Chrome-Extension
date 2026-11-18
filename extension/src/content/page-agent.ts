@@ -8,6 +8,8 @@ import { scanDocumentVideos, extractBestPageVideoTitle } from './dom-video-scann
 import { StorageService } from '../services/storage.js';
 import { initAdShield, getPageBlockedCount } from './ad-shield.js';
 import { privacyBlurManager } from './privacy-blur.js';
+import { AutofillService } from '../services/autofill-service.js';
+import { UserProfile, AutofillResult } from '../types/index.js';
 
 // Prevent duplicate execution if re-injected
 if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_PAGE_AGENT_LOADED) {
@@ -86,7 +88,60 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
    * Find field label using associated <label> element, placeholder, or aria attributes
    */
   function findFieldLabel(input: HTMLElement): string {
-    // 1. Label with 'for' attribute
+    const inputType = (input.getAttribute('type') || '').toLowerCase();
+    const isChoiceInput = inputType === 'radio' || inputType === 'checkbox';
+
+    // 1. For radio/checkbox, prioritize fieldset legend or parent question container
+    if (isChoiceInput) {
+      const fieldset = input.closest('fieldset');
+      if (fieldset) {
+        const legend = fieldset.querySelector('legend');
+        if (legend && legend.textContent?.trim()) {
+          const optionText = input.closest('label')?.textContent?.trim() || '';
+          return `${legend.textContent.trim()} ${optionText}`.trim();
+        }
+      }
+
+      const questionContainer = input.closest(
+        '[class*="question"], [class*="form-group"], [class*="field-group"], [data-qa*="question"], .field'
+      );
+      if (questionContainer) {
+        const qLabel = questionContainer.querySelector('label, [class*="label"], [class*="title"], legend');
+        if (qLabel && qLabel !== input.closest('label') && qLabel.textContent?.trim()) {
+          const optionText = input.closest('label')?.textContent?.trim() || '';
+          return `${qLabel.textContent.trim()} ${optionText}`.trim();
+        }
+      }
+    }
+
+    // 1b. For file upload inputs, check surrounding container / dropzone / headings
+    if (inputType === 'file') {
+      const container = input.closest(
+        '[class*="resume"], [id*="resume"], [class*="upload"], [id*="upload"], [class*="drop"], [class*="file"], [data-automation-id*="file"], [data-qa*="resume"], .field, .form-group, section'
+      );
+      if (container) {
+        const heading = container.querySelector(
+          'h1, h2, h3, h4, h5, h6, label, [class*="title"], [class*="label"], [class*="header"], [class*="prompt"]'
+        );
+        if (heading && heading.textContent?.trim()) {
+          return heading.textContent.trim();
+        }
+        const containerText = (container.textContent?.trim() || '').slice(0, 300);
+        if (/(resume|cv\b|curriculum|biodata)/i.test(containerText)) {
+          return 'Resume';
+        }
+      }
+
+      const prevEl = input.previousElementSibling || input.parentElement?.previousElementSibling;
+      if (prevEl && prevEl.textContent?.trim()) {
+        const txt = prevEl.textContent.trim();
+        if (/(resume|cv\b|upload|file)/i.test(txt)) {
+          return txt.slice(0, 50);
+        }
+      }
+    }
+
+    // 2. Label with 'for' attribute
     if (input.id) {
       const labelEl = document.querySelector(`label[for="${CSS.escape(input.id)}"]`);
       if (labelEl && labelEl.textContent?.trim()) {
@@ -94,13 +149,22 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       }
     }
 
-    // 2. Enclosing <label>
+    // 3. Enclosing <label>
     const parentLabel = input.closest('label');
     if (parentLabel && parentLabel.textContent?.trim()) {
       return parentLabel.textContent.trim();
     }
 
-    // 3. aria-label or aria-labelledby
+    // 4. Fieldset legend fallback
+    const fieldset = input.closest('fieldset');
+    if (fieldset) {
+      const legend = fieldset.querySelector('legend');
+      if (legend && legend.textContent?.trim()) {
+        return legend.textContent.trim();
+      }
+    }
+
+    // 5. aria-label or aria-labelledby
     const ariaLabel = input.getAttribute('aria-label');
     if (ariaLabel) return ariaLabel.trim();
 
@@ -110,12 +174,76 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       if (target && target.textContent?.trim()) return target.textContent.trim();
     }
 
-    // 4. Placeholder
+    // 6. Common ATS data attributes (data-qa, data-automation-id, data-testid)
+    const qaAttr =
+      input.getAttribute('data-qa') ||
+      input.getAttribute('data-automation-id') ||
+      input.getAttribute('data-testid');
+    if (qaAttr) return qaAttr.replace(/[-_]/g, ' ').trim();
+
+    // 7. Preceding sibling label or text container
+    const prev = input.previousElementSibling;
+    if (prev && (prev.tagName === 'LABEL' || prev.className.includes('label'))) {
+      if (prev.textContent?.trim()) return prev.textContent.trim();
+    }
+
+    // 8. Placeholder
     const placeholder = input.getAttribute('placeholder');
     if (placeholder) return placeholder.trim();
 
-    // 5. Name or id fallback
+    // 9. Name or id fallback
     return input.getAttribute('name') || input.id || '';
+  }
+
+  /**
+   * Checks whether an input element is genuinely visible and not a hidden honeypot
+   */
+  function isElementVisible(el: HTMLElement): boolean {
+    if ((el.getAttribute('type') || '').toLowerCase() === 'hidden') return false;
+    if (el.hasAttribute('disabled') || el.hasAttribute('readonly')) return false;
+
+    if (el.style) {
+      if (
+        el.style.display === 'none' ||
+        el.style.visibility === 'hidden' ||
+        el.style.opacity === '0'
+      ) {
+        return false;
+      }
+    }
+
+    try {
+      const style = window.getComputedStyle(el);
+      if (
+        style.display === 'none' ||
+        style.visibility === 'hidden' ||
+        style.opacity === '0' ||
+        style.pointerEvents === 'none'
+      ) {
+        return false;
+      }
+      if (el.offsetParent === null && style.position !== 'fixed') {
+        return false;
+      }
+    } catch {
+      // Ignore in happy-dom or unit tests
+    }
+
+    if (el.hasAttribute('hidden') || el.getAttribute('aria-hidden') === 'true') {
+      return false;
+    }
+
+    const nameOrClass = `${el.getAttribute('name') || ''} ${el.className || ''}`.toLowerCase();
+    if (
+      nameOrClass.includes('honeypot') ||
+      nameOrClass.includes('bot-field') ||
+      nameOrClass.includes('hp-field') ||
+      el.getAttribute('data-honeypot')
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -295,47 +423,73 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
         element.focus();
 
         if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-          // React 16+ controlled component compatibility: invoke native prototype setter
-          const prototype =
-            element instanceof HTMLInputElement
-              ? HTMLInputElement.prototype
-              : HTMLTextAreaElement.prototype;
-          const nativeSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
-          if (nativeSetter) {
-            nativeSetter.call(element, field.value);
-          } else {
-            element.value = field.value;
-          }
+          const inputType = (element.getAttribute('type') || '').toLowerCase();
 
-          // Dispatch standard input events
-          element.dispatchEvent(new Event('input', { bubbles: true }));
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-          element.dispatchEvent(new Event('blur', { bubbles: true }));
+          if (inputType === 'radio') {
+            const radioEl = element as HTMLInputElement;
+            const rLabel = findFieldLabel(radioEl).toLowerCase();
+            const rVal = radioEl.value.toLowerCase();
+            const targetVal = field.value.toLowerCase().trim();
 
-          // Verify value was applied
-          if (element.value === field.value) {
+            const isYes =
+              /^(yes|true|authorized)$/i.test(targetVal) &&
+              (rLabel.startsWith('yes') || rVal === '1' || rVal === 'yes' || rVal === 'true');
+            const isNo =
+              /^(no|false|unauthorized)$/i.test(targetVal) &&
+              (rLabel.startsWith('no') || rVal === '0' || rVal === 'no' || rVal === 'false');
+
+            if (isYes || isNo || rVal === targetVal || rLabel.includes(targetVal)) {
+              radioEl.checked = true;
+              radioEl.dispatchEvent(new Event('input', { bubbles: true }));
+              radioEl.dispatchEvent(new Event('change', { bubbles: true }));
+              radioEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              filledCount++;
+            }
+          } else if (inputType === 'checkbox') {
+            const checkEl = element as HTMLInputElement;
+            checkEl.checked = /^(yes|true|1|agree)$/i.test(field.value.trim());
+            checkEl.dispatchEvent(new Event('input', { bubbles: true }));
+            checkEl.dispatchEvent(new Event('change', { bubbles: true }));
             filledCount++;
           } else {
-            failedFields.push({
-              name: field.label || field.name || 'field',
-              reason: 'Value verification failed after dispatching events',
-            });
-          }
-        } else if (element instanceof HTMLSelectElement) {
-          let matched = false;
-          for (let i = 0; i < element.options.length; i++) {
-            const opt = element.options[i];
-            if (
-              opt.value.toLowerCase() === field.value.toLowerCase() ||
-              opt.text.toLowerCase().includes(field.value.toLowerCase())
-            ) {
-              element.selectedIndex = i;
-              matched = true;
-              break;
+            // React 16+ controlled component compatibility: invoke native prototype setter
+            const prototype =
+              element instanceof HTMLInputElement
+                ? HTMLInputElement.prototype
+                : HTMLTextAreaElement.prototype;
+            const nativeSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+            if (nativeSetter) {
+              nativeSetter.call(element, field.value);
+            } else {
+              element.value = field.value;
+            }
+
+            // Dispatch standard input events
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new Event('blur', { bubbles: true }));
+
+            // Verify value was applied
+            if (element.value === field.value) {
+              filledCount++;
+            } else {
+              failedFields.push({
+                name: field.label || field.name || 'field',
+                reason: 'Value verification failed after dispatching events',
+              });
             }
           }
-          element.dispatchEvent(new Event('change', { bubbles: true }));
-          if (matched) {
+        } else if (element instanceof HTMLSelectElement) {
+          const options = Array.from(element.options).map((opt) => ({
+            value: opt.value,
+            text: opt.text,
+          }));
+          const bestIndex = AutofillService.resolveSelectOptionIndex(options, field.value);
+          if (bestIndex >= 0) {
+            element.selectedIndex = bestIndex;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
+            element.dispatchEvent(new Event('blur', { bubbles: true }));
             filledCount++;
           } else {
             failedFields.push({
@@ -355,6 +509,721 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     return {
       success: filledCount > 0,
       filledCount,
+      failedFields,
+    };
+  }
+
+  function base64ToBlob(base64Data: string, contentType: string = 'application/pdf'): Blob {
+    try {
+      if (!base64Data || typeof base64Data !== 'string') {
+        return new Blob([], { type: contentType });
+      }
+
+      const parts = base64Data.split(';base64,');
+      const raw = parts.length > 1 ? parts[1] : parts[0];
+      
+      // Clean up whitespace, linebreaks, and URL-safe base64 characters
+      let cleanRaw = raw.replace(/[\r\n\s]+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+      while (cleanRaw.length % 4 !== 0) {
+        cleanRaw += '=';
+      }
+
+      const mimeMatch = base64Data.match(/^data:([^;]+);base64,/);
+      const mimeType = mimeMatch ? mimeMatch[1] : contentType || 'application/pdf';
+
+      const byteCharacters = atob(cleanRaw);
+      const byteNumbers = new Uint8Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      return new Blob([byteNumbers], { type: mimeType });
+    } catch (err) {
+      console.warn('[Z-Pilot] Error converting base64 to blob:', err);
+      return new Blob([], { type: contentType });
+    }
+  }
+
+  function attachResumeToFileInput(input: HTMLInputElement, resume: UserProfile['resume']): boolean {
+    try {
+      if (!resume || !resume.base64Data) return false;
+      const mimeType = resume.fileType || 'application/pdf';
+      const blob = base64ToBlob(resume.base64Data, mimeType);
+      if (!blob || blob.size === 0) {
+        console.warn('[Z-Pilot] Resume file blob is empty (0 bytes).');
+        return false;
+      }
+
+      const inputWin = input.ownerDocument?.defaultView || window;
+      const FileCtor = inputWin.File || File;
+      const DataTransferCtor = inputWin.DataTransfer || DataTransfer;
+
+      const fileName = resume.fileName || 'Resume.pdf';
+      const file = new FileCtor([blob], fileName, {
+        type: mimeType,
+        lastModified: resume.uploadedAt || Date.now(),
+      });
+
+      const dataTransfer = new DataTransferCtor();
+      dataTransfer.items.add(file);
+
+      // 1. Assign to input.files using native prototype setter of the input's own realm
+      let setFilesSuccess = false;
+      try {
+        const proto = inputWin.HTMLInputElement?.prototype || HTMLInputElement.prototype;
+        const descriptor = Object.getOwnPropertyDescriptor(proto, 'files');
+        if (descriptor && descriptor.set) {
+          descriptor.set.call(input, dataTransfer.files);
+          setFilesSuccess = true;
+        } else {
+          input.files = dataTransfer.files;
+          setFilesSuccess = true;
+        }
+      } catch {
+        try {
+          input.files = dataTransfer.files;
+          setFilesSuccess = true;
+        } catch {}
+      }
+
+      // Fallback defineProperty if files not yet reflected
+      if (!input.files || input.files.length === 0) {
+        try {
+          Object.defineProperty(input, 'files', {
+            value: dataTransfer.files,
+            writable: true,
+            configurable: true,
+          });
+        } catch {}
+      }
+
+      // 2. Dispatch events ONLY on the file input itself (no focus stealing, no foreign container pollution)
+      input.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+      
+      // Direct onchange call if assigned as DOM property
+      try {
+        if (typeof (input as any).onchange === 'function') {
+          (input as any).onchange(new Event('change', { bubbles: true }));
+        }
+      } catch {}
+
+      // 3. If an immediate dropzone wrapper directly encloses this input, notify it without bubbling to other form elements
+      const dropzone = input.closest(
+        '[class*="drop"], [class*="upload"], [data-automation-id*="drop"], .dropzone'
+      ) as HTMLElement | null;
+
+      if (dropzone && dropzone !== document.body && dropzone !== input.form) {
+        try {
+          let dropEvt: any;
+          try {
+            dropEvt = new DragEvent('drop', { bubbles: false, cancelable: true, dataTransfer });
+            if (!dropEvt.dataTransfer) {
+              Object.defineProperty(dropEvt, 'dataTransfer', { value: dataTransfer, configurable: true });
+            }
+          } catch {
+            dropEvt = new Event('drop', { bubbles: false, cancelable: true });
+            Object.defineProperty(dropEvt, 'dataTransfer', { value: dataTransfer, configurable: true });
+          }
+          dropzone.dispatchEvent(dropEvt);
+        } catch {}
+      }
+
+      return (input.files && input.files.length > 0) || setFilesSuccess;
+    } catch (err) {
+      console.warn('[Z-Pilot] Failed to attach resume to file input:', err);
+      return false;
+    }
+  }
+
+  function attachPhotoToFileInput(input: HTMLInputElement, photo: UserProfile['photo']): boolean {
+    try {
+      if (!photo || !photo.base64Data) return false;
+      const mimeType = photo.fileType || 'image/jpeg';
+      const blob = base64ToBlob(photo.base64Data, mimeType);
+      if (!blob || blob.size === 0) {
+        console.warn('[Z-Pilot] Passport photo blob is empty (0 bytes).');
+        return false;
+      }
+
+      const inputWin = input.ownerDocument?.defaultView || window;
+      const FileCtor = inputWin.File || File;
+      const DataTransferCtor = inputWin.DataTransfer || DataTransfer;
+
+      const fileName = photo.fileName || 'Passport_Photo.jpg';
+      const file = new FileCtor([blob], fileName, {
+        type: mimeType,
+        lastModified: photo.uploadedAt || Date.now(),
+      });
+
+      const dataTransfer = new DataTransferCtor();
+      dataTransfer.items.add(file);
+
+      // 1. Assign to input.files using native prototype setter
+      let setFilesSuccess = false;
+      try {
+        const proto = inputWin.HTMLInputElement?.prototype || HTMLInputElement.prototype;
+        const descriptor = Object.getOwnPropertyDescriptor(proto, 'files');
+        if (descriptor && descriptor.set) {
+          descriptor.set.call(input, dataTransfer.files);
+          setFilesSuccess = true;
+        } else {
+          input.files = dataTransfer.files;
+          setFilesSuccess = true;
+        }
+      } catch {
+        try {
+          input.files = dataTransfer.files;
+          setFilesSuccess = true;
+        } catch {}
+      }
+
+      // Fallback defineProperty if files not yet reflected
+      if (!input.files || input.files.length === 0) {
+        try {
+          Object.defineProperty(input, 'files', {
+            value: dataTransfer.files,
+            writable: true,
+            configurable: true,
+          });
+        } catch {}
+      }
+
+      // 2. Dispatch events ONLY on the file input itself
+      input.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+
+      // Direct onchange call if assigned as DOM property
+      try {
+        if (typeof (input as any).onchange === 'function') {
+          (input as any).onchange(new Event('change', { bubbles: true }));
+        }
+      } catch {}
+
+      // 3. Notify immediate dropzone wrapper if present without bubbling
+      const dropzone = input.closest(
+        '[class*="drop"], [class*="upload"], [data-automation-id*="drop"], .dropzone'
+      ) as HTMLElement | null;
+
+      if (dropzone && dropzone !== document.body && dropzone !== input.form) {
+        try {
+          let dropEvt: any;
+          try {
+            dropEvt = new DragEvent('drop', { bubbles: false, cancelable: true, dataTransfer });
+            if (!dropEvt.dataTransfer) {
+              Object.defineProperty(dropEvt, 'dataTransfer', { value: dataTransfer, configurable: true });
+            }
+          } catch {
+            dropEvt = new Event('drop', { bubbles: false, cancelable: true });
+            Object.defineProperty(dropEvt, 'dataTransfer', { value: dataTransfer, configurable: true });
+          }
+          dropzone.dispatchEvent(dropEvt);
+        } catch {}
+      }
+
+      return (input.files && input.files.length > 0) || setFilesSuccess;
+    } catch (err) {
+      console.warn('[Z-Pilot] Failed to attach passport photo to file input:', err);
+      return false;
+    }
+  }
+
+  function findBestPhotoFileInput(
+    root: Document = document,
+    excludeInput?: HTMLInputElement | null
+  ): HTMLInputElement | null {
+    const fileInputs: HTMLInputElement[] = [];
+
+    function collectFromNode(node: Document | ShadowRoot) {
+      const inputs = Array.from(node.querySelectorAll('input[type="file"]')) as HTMLInputElement[];
+      fileInputs.push(...inputs);
+
+      // Recursive Shadow DOM traversal
+      const allEls = Array.from(node.querySelectorAll('*'));
+      for (const el of allEls) {
+        if (el.shadowRoot) {
+          collectFromNode(el.shadowRoot);
+        }
+      }
+    }
+
+    collectFromNode(root);
+
+    // Also check accessible same-origin iframes
+    const iframes = Array.from(document.querySelectorAll('iframe'));
+    for (const f of iframes) {
+      try {
+        if (f.contentDocument) {
+          collectFromNode(f.contentDocument);
+        }
+      } catch {}
+    }
+
+    const available = fileInputs.filter((inp) => !inp.disabled && inp !== excludeInput);
+    if (available.length === 0) return null;
+
+    let bestInput: HTMLInputElement | null = null;
+    let highestScore = -999;
+
+    for (const input of available) {
+      let score = 0;
+      const id = (input.id || '').toLowerCase();
+      const name = (input.name || '').toLowerCase();
+      const accept = (input.getAttribute('accept') || '').toLowerCase();
+      const aria = (input.getAttribute('aria-label') || '').toLowerCase();
+      const dataQa = (
+        input.getAttribute('data-qa') ||
+        input.getAttribute('data-automation-id') ||
+        input.getAttribute('data-testid') ||
+        ''
+      ).toLowerCase();
+
+      const label = findFieldLabel(input).toLowerCase();
+      const container = input.closest(
+        '[class*="photo"], [id*="photo"], [class*="avatar"], [id*="avatar"], [class*="picture"], [id*="picture"], [class*="headshot"], [id*="headshot"], [class*="passport"], [id*="passport"], .form-group, .field, section'
+      );
+      const containerText = (container?.textContent || '').slice(0, 300).toLowerCase();
+
+      // Strong positive indicators for photo / avatar / headshot / passport photo
+      if (/\b(photo|avatar|picture|headshot|passport|photograph|profile[_-]?pic|applicant[_-]?pic)\b/i.test(id)) score += 60;
+      if (/\b(photo|avatar|picture|headshot|passport|photograph|profile[_-]?pic|applicant[_-]?pic)\b/i.test(name)) score += 60;
+      if (/\b(photo|avatar|picture|headshot|passport|photograph|profile[_-]?pic|applicant[_-]?pic)\b/i.test(label)) score += 70;
+      if (/\b(photo|avatar|picture|headshot|passport|photograph|profile[_-]?pic|applicant[_-]?pic)\b/i.test(aria)) score += 60;
+      if (/\b(photo|avatar|picture|headshot|passport|photograph|profile[_-]?pic|applicant[_-]?pic)\b/i.test(dataQa)) score += 60;
+      if (/\b(photo|avatar|picture|headshot|passport|photograph|profile[_-]?pic|applicant[_-]?pic)\b/i.test(containerText)) score += 40;
+
+      // Accept attribute matches image types
+      if (/\b(image\/|jpg|jpeg|png|webp)\b/i.test(accept)) score += 30;
+
+      // Heavy negative penalties for resume / cover letter / document inputs (NEVER touch resume or cover letter)
+      if (/\b(resume|cv\b|curriculum[_-]?vitae|biodata)\b/i.test(id + ' ' + name + ' ' + label + ' ' + aria + ' ' + dataQa + ' ' + containerText)) {
+        score -= 250;
+      }
+      if (/\b(cover[_-]?letter|coverletter)\b/i.test(id + ' ' + name + ' ' + label + ' ' + aria + ' ' + dataQa + ' ' + containerText)) {
+        score -= 200;
+      }
+      if (/\b(transcript|certificate|reference|sample|portfolio|document)\b/i.test(id + ' ' + name + ' ' + label + ' ' + aria)) {
+        score -= 100;
+      }
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestInput = input;
+      }
+    }
+
+    if (highestScore > 0) return bestInput;
+    return null;
+  }
+
+  function findBestResumeFileInput(root: Document = document): HTMLInputElement | null {
+    const fileInputs: HTMLInputElement[] = [];
+
+    function collectFromNode(node: Document | ShadowRoot) {
+      const inputs = Array.from(node.querySelectorAll('input[type="file"]')) as HTMLInputElement[];
+      fileInputs.push(...inputs);
+
+      // Recursive Shadow DOM traversal (Workday Web Components)
+      const allEls = Array.from(node.querySelectorAll('*'));
+      for (const el of allEls) {
+        if (el.shadowRoot) {
+          collectFromNode(el.shadowRoot);
+        }
+      }
+    }
+
+    collectFromNode(root);
+
+    // Also check accessible same-origin iframes (Greenhouse embeds, Lever embeds)
+    const iframes = Array.from(document.querySelectorAll('iframe'));
+    for (const f of iframes) {
+      try {
+        if (f.contentDocument) {
+          collectFromNode(f.contentDocument);
+        }
+      } catch {}
+    }
+
+    if (fileInputs.length === 0) return null;
+
+    // Filter out disabled inputs
+    const available = fileInputs.filter((inp) => !inp.disabled);
+    if (available.length === 0) return null;
+
+    let bestInput: HTMLInputElement | null = null;
+    let highestScore = -999;
+
+    for (const input of available) {
+      let score = 0;
+      const id = (input.id || '').toLowerCase();
+      const name = (input.name || '').toLowerCase();
+      const accept = (input.getAttribute('accept') || '').toLowerCase();
+      const aria = (input.getAttribute('aria-label') || '').toLowerCase();
+      const dataQa = (
+        input.getAttribute('data-qa') ||
+        input.getAttribute('data-automation-id') ||
+        input.getAttribute('data-testid') ||
+        ''
+      ).toLowerCase();
+
+      const label = findFieldLabel(input).toLowerCase();
+      const container = input.closest(
+        '[class*="resume"], [id*="resume"], [class*="upload"], [id*="upload"], [class*="drop"], [data-qa*="resume"], .form-group, .field, section'
+      );
+      const containerText = (container?.textContent || '').slice(0, 300).toLowerCase();
+
+      // Strong positive indicators for Resume / CV
+      if (/\b(resume|cv\b|curriculum[_-]?vitae|biodata|bio[_-]?data)\b/i.test(id)) score += 60;
+      if (/\b(resume|cv\b|curriculum[_-]?vitae|biodata|bio[_-]?data)\b/i.test(name)) score += 60;
+      if (/\b(resume|cv\b|curriculum[_-]?vitae|biodata|bio[_-]?data)\b/i.test(label)) score += 70;
+      if (/\b(resume|cv\b|curriculum[_-]?vitae|biodata|bio[_-]?data)\b/i.test(aria)) score += 60;
+      if (/\b(resume|cv\b|curriculum[_-]?vitae|biodata|bio[_-]?data)\b/i.test(dataQa)) score += 60;
+      if (/\b(resume|cv\b|curriculum[_-]?vitae|biodata|bio[_-]?data)\b/i.test(containerText)) score += 40;
+
+      // Accept attribute matches PDF / DOCX
+      if (/\b(pdf|docx?|msword)\b/i.test(accept)) score += 20;
+
+      // Heavy negative penalties for non-resume file inputs (NEVER touch cover letters, photos, or other files)
+      if (/\b(cover[_-]?letter|coverletter)\b/i.test(id + ' ' + name + ' ' + label + ' ' + aria + ' ' + dataQa + ' ' + containerText)) {
+        score -= 200;
+      }
+      if (/\b(photo|avatar|profile[_-]?pic|picture|headshot|image|passport|photograph)\b/i.test(id + ' ' + name + ' ' + label + ' ' + aria + ' ' + dataQa + ' ' + containerText)) {
+        score -= 200;
+      }
+      if (/\b(transcript|certificate|reference|sample|portfolio|additional|other)\b/i.test(id + ' ' + name + ' ' + label + ' ' + aria)) {
+        score -= 100;
+      }
+
+      if (score > highestScore) {
+        highestScore = score;
+        bestInput = input;
+      }
+    }
+
+    if (highestScore > 0) return bestInput;
+    if (available.length === 1 && highestScore >= 0) return available[0];
+
+    return null;
+  }
+
+  /**
+   * One-Click Smart Autofill for Job Applications & Web Forms
+   * Inspects all active inputs, matches against user profile using semantic heuristics,
+   * respects already-filled fields to prevent overwriting user edits, and populates fields safely.
+   */
+  function runPageAutofill(
+    profile: UserProfile,
+    options?: { overwriteExisting?: boolean; resumeOnly?: boolean; photoOnly?: boolean }
+  ): AutofillResult {
+    const overwrite = options?.overwriteExisting === true;
+    const resumeOnly = options?.resumeOnly === true;
+    const photoOnly = options?.photoOnly === true;
+    const filledDetails: Array<{ label: string; fieldName: string; valueSnippet: string }> = [];
+    const failedFields: Array<{ name: string; reason: string }> = [];
+    let filledCount = 0;
+
+    // ── STEP 1a: Intelligent Resume / CV Attachment (EXACTLY 1 RESUME INPUT) ──
+    let resumeAttachedInput: HTMLInputElement | null = null;
+    if (!photoOnly && profile.resume && profile.resume.base64Data) {
+      const bestInput = findBestResumeFileInput();
+      if (bestInput) {
+        // If resumeOnly is true, user explicitly requested upload, so we attach even if input had prior file
+        const shouldAttach = resumeOnly || overwrite || !bestInput.files || bestInput.files.length === 0;
+        if (shouldAttach) {
+          const attached = attachResumeToFileInput(bestInput, profile.resume);
+          if (attached) {
+            resumeAttachedInput = bestInput;
+            filledCount++;
+            filledDetails.push({
+              label: findFieldLabel(bestInput) || bestInput.name || 'Resume Upload',
+              fieldName: 'Resume / CV File',
+              valueSnippet: profile.resume.fileName || 'Resume.pdf',
+            });
+          } else if (resumeOnly) {
+            failedFields.push({
+              name: 'resume',
+              reason: 'Found resume upload field, but the page rejected file attachment.',
+            });
+          }
+        } else if (resumeOnly) {
+          filledCount++;
+          filledDetails.push({
+            label: findFieldLabel(bestInput) || bestInput.name || 'Resume Upload',
+            fieldName: 'Resume / CV File',
+            valueSnippet: 'Already attached',
+          });
+        }
+      } else if (resumeOnly) {
+        failedFields.push({
+          name: 'resume',
+          reason: 'No resume upload field or dropzone detected on this webpage. Ensure the form is open and visible.',
+        });
+      }
+    } else if (resumeOnly) {
+      return {
+        success: false,
+        filledCount: 0,
+        totalScanned: 0,
+        filledDetails: [],
+        failedFields: [{ name: 'resume', reason: 'No resume file stored in your Z-Pilot profile. Please upload one in the Resume tab first.' }],
+      };
+    }
+
+    // If requested only resume upload, return right away with clear result
+    if (resumeOnly) {
+      return {
+        success: filledCount > 0,
+        filledCount,
+        totalScanned: resumeAttachedInput ? 1 : 0,
+        filledDetails,
+        failedFields,
+      };
+    }
+
+    // ── STEP 1b: Intelligent Passport Size Photo Attachment (EXACTLY 1 PHOTO INPUT) ──
+    let photoAttachedInput: HTMLInputElement | null = null;
+    if (!resumeOnly && profile.photo && profile.photo.base64Data) {
+      const bestPhotoInput = findBestPhotoFileInput(document, resumeAttachedInput);
+      if (bestPhotoInput) {
+        const shouldAttachPhoto = photoOnly || overwrite || !bestPhotoInput.files || bestPhotoInput.files.length === 0;
+        if (shouldAttachPhoto) {
+          const attached = attachPhotoToFileInput(bestPhotoInput, profile.photo);
+          if (attached) {
+            photoAttachedInput = bestPhotoInput;
+            filledCount++;
+            filledDetails.push({
+              label: findFieldLabel(bestPhotoInput) || bestPhotoInput.name || 'Passport Photo Upload',
+              fieldName: 'Passport Size Photo',
+              valueSnippet: profile.photo.fileName || 'Passport_Photo.jpg',
+            });
+          } else if (photoOnly) {
+            failedFields.push({
+              name: 'photo',
+              reason: 'Found photo upload field, but the page rejected file attachment.',
+            });
+          }
+        } else if (photoOnly) {
+          filledCount++;
+          filledDetails.push({
+            label: findFieldLabel(bestPhotoInput) || bestPhotoInput.name || 'Passport Photo Upload',
+            fieldName: 'Passport Size Photo',
+            valueSnippet: 'Already attached',
+          });
+        }
+      } else if (photoOnly) {
+        failedFields.push({
+          name: 'photo',
+          reason: 'No passport photo or avatar upload field detected on this webpage. Ensure the form is open and visible.',
+        });
+      }
+    } else if (photoOnly) {
+      return {
+        success: false,
+        filledCount: 0,
+        totalScanned: 0,
+        filledDetails: [],
+        failedFields: [{ name: 'photo', reason: 'No passport photo stored in your Z-Pilot profile. Please upload one in the Resume & Photo tab first.' }],
+      };
+    }
+
+    // If requested only photo upload, return right away with clear result
+    if (photoOnly) {
+      return {
+        success: filledCount > 0,
+        filledCount,
+        totalScanned: photoAttachedInput ? 1 : 0,
+        filledDetails,
+        failedFields,
+      };
+    }
+
+    // ── STEP 2: Full Form Field Autofill (Text, Dropdowns, Radios, Checkboxes, Textareas) ──
+    // File inputs are strictly excluded here so they are NEVER disturbed or overwritten
+    function collectFormElements(node: Document | ShadowRoot): HTMLElement[] {
+      const elements = Array.from(
+        node.querySelectorAll(
+          'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):not([type="file"]), textarea, select'
+        )
+      ) as HTMLElement[];
+
+      const allEls = Array.from(node.querySelectorAll('*'));
+      for (const el of allEls) {
+        if (el.shadowRoot) {
+          elements.push(...collectFormElements(el.shadowRoot));
+        }
+      }
+      return elements;
+    }
+
+    const allInputs = collectFormElements(document);
+
+    const processedRadioGroups = new Set<string>();
+
+    for (const el of allInputs) {
+      const type = (el.getAttribute('type') || el.tagName.toLowerCase()).toLowerCase();
+      if (type === 'password' || type === 'search' || type === 'file') continue;
+
+      // 1. Skip invisible elements, honeypots, disabled/readonly fields
+      if (!isElementVisible(el)) continue;
+
+      const id = el.id || undefined;
+      const name = el.getAttribute('name') || undefined;
+      const role = el.getAttribute('role') || undefined;
+      if (role === 'searchbox') continue;
+
+      // 2. Protect existing inputs from unwanted overwriting (Safe Mode)
+      if (!overwrite) {
+        if (type === 'radio' && name) {
+          const groupRadios = Array.from(
+            document.querySelectorAll(`input[type="radio"][name="${CSS.escape(name)}"]`)
+          ) as HTMLInputElement[];
+          if (groupRadios.some((r) => r.checked)) {
+            processedRadioGroups.add(name);
+            continue;
+          }
+        } else if (el instanceof HTMLSelectElement) {
+          if (el.selectedIndex > 0 && el.value !== '') continue;
+        } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+          if (type !== 'checkbox' && el.value && el.value.trim().length > 0) {
+            continue;
+          }
+        }
+      }
+
+      const label = findFieldLabel(el);
+      const placeholder = el.getAttribute('placeholder') || undefined;
+      const ariaLabel = el.getAttribute('aria-label') || undefined;
+      const autocomplete = el.getAttribute('autocomplete') || undefined;
+
+      if (type === 'radio' && name && processedRadioGroups.has(name)) {
+        continue;
+      }
+
+      let optionsList: Array<{ value: string; text: string }> | undefined;
+      if (el instanceof HTMLSelectElement) {
+        optionsList = Array.from(el.options).map((o) => ({ value: o.value, text: o.text }));
+      }
+
+      const matched = AutofillService.matchField(
+        {
+          id,
+          name,
+          type,
+          label,
+          placeholder,
+          ariaLabel,
+          autocomplete,
+          role,
+          options: optionsList,
+        },
+        profile
+      );
+
+      if (!matched || !matched.value) continue;
+
+      // Sanitize numeric fields (strip currency symbols or 'years' if input type="number")
+      const finalValue = AutofillService.sanitizeValueForField(matched.value, type);
+      if (!finalValue && type === 'number') continue;
+
+      try {
+        if (type === 'radio' && name) {
+          const radios = Array.from(
+            document.querySelectorAll(`input[type="radio"][name="${CSS.escape(name)}"]`)
+          ) as HTMLInputElement[];
+          let radioFilled = false;
+          for (const r of radios) {
+            const rLabel = findFieldLabel(r).toLowerCase();
+            const rVal = r.value.toLowerCase();
+            const targetVal = matched.value.toLowerCase().trim();
+
+            const isYes =
+              /^(yes|true|authorized)$/i.test(targetVal) &&
+              (rLabel.startsWith('yes') || rVal === '1' || rVal === 'yes' || rVal === 'true');
+            const isNo =
+              /^(no|false|unauthorized)$/i.test(targetVal) &&
+              (rLabel.startsWith('no') || rVal === '0' || rVal === 'no' || rVal === 'false');
+
+            if (isYes || isNo || rVal === targetVal || rLabel.includes(targetVal)) {
+              r.checked = true;
+              r.dispatchEvent(new Event('input', { bubbles: true }));
+              r.dispatchEvent(new Event('change', { bubbles: true }));
+              r.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              radioFilled = true;
+              break;
+            }
+          }
+          if (radioFilled) {
+            processedRadioGroups.add(name);
+            filledCount++;
+            filledDetails.push({
+              label: label || name,
+              fieldName: matched.label,
+              valueSnippet: matched.value.slice(0, 30),
+            });
+          }
+        } else if (el instanceof HTMLSelectElement) {
+          const options = Array.from(el.options).map((o) => ({ value: o.value, text: o.text }));
+          const bestIndex = AutofillService.resolveSelectOptionIndex(options, matched.value);
+          if (bestIndex >= 0) {
+            el.selectedIndex = bestIndex;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            el.dispatchEvent(new Event('blur', { bubbles: true }));
+            filledCount++;
+            filledDetails.push({
+              label: label || name || 'Dropdown',
+              fieldName: matched.label,
+              valueSnippet: el.options[bestIndex].text.slice(0, 30),
+            });
+          }
+        } else if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+          if (type === 'checkbox') {
+            const checkEl = el as HTMLInputElement;
+            checkEl.checked = /^(yes|true|1|agree)$/i.test(matched.value.trim());
+            checkEl.dispatchEvent(new Event('input', { bubbles: true }));
+            checkEl.dispatchEvent(new Event('change', { bubbles: true }));
+            filledCount++;
+            filledDetails.push({
+              label: label || name || 'Checkbox',
+              fieldName: matched.label,
+              valueSnippet: checkEl.checked ? 'Checked' : 'Unchecked',
+            });
+          } else {
+            const prototype =
+              el instanceof HTMLInputElement
+                ? HTMLInputElement.prototype
+                : HTMLTextAreaElement.prototype;
+            const nativeSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+            if (nativeSetter) {
+              nativeSetter.call(el, finalValue);
+            } else {
+              el.value = finalValue;
+            }
+
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            el.dispatchEvent(new Event('blur', { bubbles: true }));
+
+            filledCount++;
+            filledDetails.push({
+              label: label || name || 'Field',
+              fieldName: matched.label,
+              valueSnippet: finalValue.slice(0, 30),
+            });
+          }
+        }
+      } catch (err: unknown) {
+        failedFields.push({
+          name: label || name || 'field',
+          reason: (err as Error).message,
+        });
+      }
+    }
+
+    return {
+      success: filledCount > 0,
+      filledCount,
+      totalScanned: allInputs.length,
+      filledDetails,
       failedFields,
     };
   }
@@ -415,6 +1284,9 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     };
   }
 
+  // Expose global runner for multi-frame scripting calls
+  (window as unknown as { __zPilotAutofill?: typeof runPageAutofill }).__zPilotAutofill = runPageAutofill;
+
   // Runtime message listener
   chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     switch (request.type) {
@@ -452,6 +1324,12 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
 
       case 'FILL_FIELDS': {
         const result = fillFormFields(request.fields || []);
+        sendResponse(result);
+        return false;
+      }
+
+      case 'AUTOFILL_JOB_FORM': {
+        const result = runPageAutofill(request.profile || {}, request.options);
         sendResponse(result);
         return false;
       }
@@ -904,7 +1782,7 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     // 3. Retailer-Specific Selectors
     if (!title) {
       const el = document.querySelector(
-        '#productTitle, .product-title, h1[itemprop="name"], .B_NuCI, .x-item-title__mainTitle, .pdp-title'
+        '#productTitle, .product-title, h1[itemprop="name"], .B_NuCI, ._2NKhZn, .x-item-title__mainTitle, .pdp-title, [data-testid="product-title"], h1'
       );
       if (el) title = el.textContent?.trim() || '';
     }
@@ -914,21 +1792,48 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
     }
     if (!title) title = document.title;
 
+    // Clean up store brand clutter from title
+    title = title
+      .replace(/^Amazon\.[a-z.]+\s*:\s*/i, '')
+      .replace(/\s*:\s*Amazon\.[a-z.]+.*$/i, '')
+      .replace(/\s*-\s*Flipkart\.com.*$/i, '')
+      .replace(/\s*\|\s*Walmart\.com.*$/i, '')
+      .replace(/\s*\|\s*eBay.*$/i, '')
+      .replace(/\s*\|\s*Target.*$/i, '')
+      .replace(/\s*\|\s*Myntra.*$/i, '')
+      .trim();
+
+    // 4. Reliable Selling Price Extraction (Excluding Struck-Through MRP/List Prices)
     if (!rawPriceText) {
-      const priceEl = document.querySelector(
-        '.a-price .a-offscreen, #priceblock_ourprice, #priceblock_dealprice, ._30jeq3._16Jk6d, [data-seo-id="hero-price"], .x-price-primary, .price-item--regular, .pdp-price, .product__price, span[itemprop="price"]'
+      const prioritySellingPriceEl = document.querySelector(
+        '#corePriceDisplay_desktop_feature_div .a-price:not(.a-text-price) .a-offscreen, #corePrice_desktop .a-price:not(.a-text-price) .a-offscreen, .priceToPay .a-offscreen, #priceblock_dealprice, #priceblock_ourprice, .apexPriceToPay .a-offscreen, #price_inside_buybox, div._30jeq3._16Jk6d, div._30jeq3, .Nx9bqj.CxhGGd, .Nx9bqj, [data-testid="price-wrap"] [itemprop="price"], span[data-seo-id="hero-price"], [data-testid="x-price-primary"] .ux-textspans, .x-price-primary, #prcIsum, .pdp-price strong, .pdp-price, [data-test="product-price"], [data-test="product-price-reduced"], .price--on-sale .price-item--sale, .price-item--sale, .product-price, .price__regular .price-item--regular, span[itemprop="price"], .product__price'
       );
-      if (priceEl) rawPriceText = priceEl.textContent?.trim() || '';
+      if (prioritySellingPriceEl) {
+        rawPriceText = prioritySellingPriceEl.textContent?.trim() || '';
+      }
     }
 
     if (!rawPriceText) {
-      // Generic currency regex search in small leaf nodes
-      const priceCandidates = Array.from(document.querySelectorAll('span, div, p')).filter(
-        (el) => {
-          const txt = el.textContent?.trim() || '';
-          return /^[\$€£₹¥]\s?[0-9,]+(?:\.[0-9]{2})?$/.test(txt) && el.children.length === 0;
-        }
+      // General price elements, strictly avoiding strikethrough classes
+      const candidate = document.querySelector(
+        '.a-price .a-offscreen:not(.a-text-price .a-offscreen), span[itemprop="price"]'
       );
+      if (candidate) {
+        rawPriceText = candidate.textContent?.trim() || '';
+      }
+    }
+
+    if (!rawPriceText) {
+      // Regex search in leaf nodes inside main container
+      const container = document.querySelector('#centerCol, #dp-container, main, [role="main"]') || document.body;
+      const priceCandidates = Array.from(container.querySelectorAll('span, div, p')).filter((el) => {
+        // Exclude struck through elements
+        if (el.closest('.a-text-price, del, s, strike, [class*="strike"], [class*="was-price"], [class*="list-price"]')) {
+          return false;
+        }
+        const txt = el.textContent?.trim() || '';
+        return /^[\$€£₹¥]\s?[0-9,]+(?:\.[0-9]{2})?$/.test(txt) && el.children.length === 0;
+      });
       if (priceCandidates.length > 0) {
         rawPriceText = priceCandidates[0].textContent?.trim() || '';
       }
@@ -936,32 +1841,43 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
 
     if (!imageUrl) {
       const imgEl = document.querySelector(
-        '#landingImage, #imgBlkFront, .product-image img, [data-hook="main-image"], ._396cs4, .x-photos-min-view img'
+        '#landingImage, #imgBlkFront, .product-image img, [data-hook="main-image"], ._396cs4, ._53G40d img, .x-photos-min-view img'
       ) as HTMLImageElement | null;
       if (imgEl) imageUrl = imgEl.src || imgEl.currentSrc || '';
     }
 
-    // Reviews extraction
+    // 5. Authentic Reviews Extraction (Top visible buyer reviews)
     if (pageReviews.length === 0) {
       const reviewEls = document.querySelectorAll(
-        '[data-hook="review-body"], .review-text, ._6K-7Co, .customer-review, .user-review, [class*="review-content"]'
+        'div[data-hook="review-collapsed"] span, div[data-hook="review-body"] span, .review-text-content span, [data-hook="review-body"], div._6K-7Co, div.ZmyHeo div, div._27M-vq, div[data-automation-id="review-text"], .spr-review-content-body, .jdgm-rev__body, .yotpo-review-wrapper, .customer-review, .user-review, [class*="review-content"]'
       );
       reviewEls.forEach((el) => {
-        const text = el.textContent?.trim();
-        if (text && text.length > 15 && pageReviews.length < 15) {
+        const text = el.textContent?.replace(/\s+/g, ' ')?.trim();
+        if (text && text.length > 20 && !pageReviews.includes(text) && pageReviews.length < 15) {
           pageReviews.push(text.slice(0, 500));
         }
       });
     }
 
-    // Rating extraction
+    // 6. Rating Extraction
     if (!rating) {
       const ratingEl = document.querySelector(
-        '#acrPopover, [data-hook="rating-out-of-text"], ._3LWZlK, [class*="rating-stars"]'
+        '#acrPopover, [data-hook="rating-out-of-text"], i.a-icon-star span.a-icon-alt, div._3LWZlK, div.XQDdHH, span.rating-number, [data-testid="item-review-section"], [itemprop="ratingValue"]'
       );
       if (ratingEl) {
         const match = ratingEl.textContent?.match(/([0-9]+(?:\.[0-9]+)?)/);
         if (match) rating = parseFloat(match[1]);
+      }
+    }
+
+    // 7. Review Count Extraction
+    if (!reviewCount) {
+      const countEl = document.querySelector(
+        '#acrCustomerReviewText, [data-hook="total-review-count"], span._2_R_DZ, span.Wphh3K, [data-testid="review-count"], [itemprop="reviewCount"]'
+      );
+      if (countEl) {
+        const match = countEl.textContent?.replace(/,/g, '')?.match(/([0-9]+)/);
+        if (match) reviewCount = parseInt(match[1], 10);
       }
     }
 

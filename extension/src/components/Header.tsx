@@ -16,6 +16,7 @@ import {
   ScanText,
   EyeOff,
   ShoppingBag,
+  UserCheck,
 } from 'lucide-react';
 import { BrandMark } from './BrandLogo.js';
 
@@ -46,6 +47,7 @@ interface HeaderProps {
   blockedAdsCount?: number;
   hasMessages?: boolean;
   websiteUrl?: string;
+  onOpenAutofillProfile?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -73,6 +75,7 @@ export const Header: React.FC<HeaderProps> = ({
   blockedAdsCount = 0,
   hasMessages = false,
   websiteUrl = 'https://zeesu-royalist.vercel.app',
+  onOpenAutofillProfile,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -143,6 +146,13 @@ export const Header: React.FC<HeaderProps> = ({
       onClick: onOpenPrivacyBlur,
       badge: null,
       available: !!onOpenPrivacyBlur,
+    },
+    {
+      label: 'Job Autofill',
+      icon: UserCheck,
+      onClick: onOpenAutofillProfile,
+      badge: 'JOBS',
+      available: !!onOpenAutofillProfile,
     },
     {
       label: 'Shopping',

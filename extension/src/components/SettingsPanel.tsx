@@ -299,11 +299,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <User className="w-4 h-4 stroke-[1.75]" />
               </div>
               <div>
-                <div className="text-xs font-semibold text-white">Form Autofill Profile</div>
+                <div className="text-xs font-semibold text-white">Job & Form Autofill Profile</div>
                 <div className="text-[11px] text-white/50 truncate max-w-[200px]">
-                  {userProfile?.fullName
-                    ? `${userProfile.fullName} • ${userProfile.email || 'Configured'}`
-                    : 'Personal details for 1-click web form filling'}
+                  {userProfile?.fullName || userProfile?.jobTitle
+                    ? `${userProfile.fullName || 'Candidate'}${userProfile.jobTitle ? ` • ${userProfile.jobTitle}` : ''}`
+                    : 'Personal & Job details for 1-click application filling'}
                 </div>
               </div>
             </div>
