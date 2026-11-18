@@ -33,6 +33,18 @@
     <a href="#-faq"><b>❓ FAQ</b></a>
   </p>
 
+</div>
+
+---
+
+<div align="center">
+
+| 🚀 **10x Faster** | 🛡️ **Zero Ads** | 💰 **$0 / Month** | 🔒 **100% Private** |
+| :---: | :---: | :---: | :---: |
+| Instant summaries & answers | Clean web with no banners or popups | 100% Free Google Gemini quota | All data stays inside your browser |
+
+<br>
+
   <p align="center">
     <sub>⚡ <b>Live In Action:</b> Browsing jobs on LinkedIn with instant 1-Click AI Form Autofill, Resume &amp; Photo Auto-Attach, and Sidepanel Copilot.</sub>
   </p>
@@ -43,16 +55,6 @@
       <img src="assets/z-pilot-live-showcase.jpg" width="100%" alt="Z-Pilot AI Browser Agent - Live LinkedIn Job Autofill & AI Copilot" style="max-width: 900px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 36px rgba(0,0,0,0.5);" />
     </a>
   </p>
-
-</div>
-
----
-
-<div align="center">
-
-| 🚀 **10x Faster** | 🛡️ **Zero Ads** | 💰 **$0 / Month** | 🔒 **100% Private** |
-| :---: | :---: | :---: | :---: |
-| Instant summaries & answers | Clean web with no banners or popups | 100% Free Google Gemini quota | All data stays inside your browser |
 
 </div>
 
