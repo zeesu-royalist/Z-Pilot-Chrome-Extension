@@ -11,8 +11,8 @@
   </p>
 
   <p align="center">
-    <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0">
-      <img src="https://img.shields.io/badge/⬇️_GET_Z--PILOT_v2.4.0-(FOLDER)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Get Z-Pilot v2.4.0 Folder" />
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip" title="1-Click Download Z-Pilot v2.4.0 ZIP">
+      <img src="https://img.shields.io/badge/⬇️_FREE_DOWNLOAD-Z--Pilot_v2.4.0_(ZIP)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Download Z-Pilot v2.4.0" />
     </a>
   </p>
 
@@ -28,7 +28,7 @@
   <p align="center">
     <a href="#-why-z-pilot"><b>💡 Why Z-Pilot</b></a> &nbsp;•&nbsp;
     <a href="#-superpowers"><b>⚡ Superpowers</b></a> &nbsp;•&nbsp;
-    <a href="#-quick-install-1-click-drag--drop"><b>🚀 1-Click Install</b></a> &nbsp;•&nbsp;
+    <a href="#-quick-install-in-1-minute"><b>🚀 1-Min Install</b></a> &nbsp;•&nbsp;
     <a href="#-get-free-ai-key"><b>🔑 Free AI Key</b></a> &nbsp;•&nbsp;
     <a href="#-faq"><b>❓ FAQ</b></a>
   </p>
@@ -51,7 +51,7 @@
 
   <!-- ── LIVE PRODUCT SHOWCASE / AD BANNER ── -->
   <p align="center">
-    <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0" title="Go to Z-Pilot Extension Folder">
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip" title="1-Click Download Z-Pilot v2.4.0">
       <img src="assets/z-pilot-live-showcase.jpg" width="100%" alt="Z-Pilot AI Browser Agent - Live LinkedIn Job Autofill & AI Copilot" style="max-width: 900px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 36px rgba(0,0,0,0.5);" />
     </a>
   </p>
@@ -157,21 +157,40 @@ Instead of opening 10 different tabs or slowing down your computer with 8 separa
 
 ---
 
-## 🚀 Quick Install (1-Click Drag & Drop!)
+## 🚀 Quick Install (In 1 Minute!)
+
+No coding or terminal knowledge required. Follow these simple steps:
+
+### 1️⃣ Step 1: 1-Click Download Bundle
+Click to download the latest ultra-lightweight ZIP bundle (~360 KB):
 
 <p align="center">
-  <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0">
-    <img src="https://img.shields.io/badge/📂_OPEN_EXTENSION_FOLDER-release%2Fz--pilot--v2.4.0-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="38" alt="Open Extension Folder" />
+  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
+    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.4.0.zip-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="38" alt="Download ZIP" />
   </a>
 </p>
 
-No terminal commands, no building, and **zero extracting needed**! The extension is already built and ready in the **[`release/z-pilot-v2.4.0`](https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0)** folder:
+> 💡 *Unzip the downloaded file on your computer.*  
+> *(Cloned the repo? The pre-built unpacked folder is already available at [`release/z-pilot-v2.4.0`](https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0) — zero unzipping needed!)*
 
-1. Open **`chrome://extensions`** in your browser.
-   *(Using Brave? `brave://extensions` • Using Edge? `edge://extensions`)*
-2. In the top-right corner, **turn ON "Developer mode"**.
-3. Simply **Drag & Drop** the folder **[`release/z-pilot-v2.4.0`](https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0)** directly into the extensions window (or click **"Load unpacked"** and select it).
-4. Click the browser puzzle icon (🧩) and **Pin (📌) Z-Pilot** to your toolbar.
+---
+
+### 2️⃣ Step 2: Open Extensions in Your Browser
+Copy the link below, paste it into your browser address bar, and press **Enter**:
+
+```text
+chrome://extensions
+```
+
+> 💡 **Using Brave?** Use `brave://extensions` &nbsp;•&nbsp; **Using Edge?** Use `edge://extensions`
+
+👉 In the top-right corner, **turn ON the "Developer mode" switch**.
+
+---
+
+### 3️⃣ Step 3: Load & Pin
+1. Drag & drop the unzipped folder directly into your `chrome://extensions` page (or click **"Load unpacked"** and select it).
+2. Click the browser puzzle icon (🧩) and **Pin (📌) Z-Pilot** to your toolbar.
 
 🎉 **Done! Click the Z-Pilot icon to open your AI browser side panel.**
 
@@ -224,8 +243,8 @@ Google Chrome, Brave, Microsoft Edge, Opera, Vivaldi, and any Chromium-based bro
   ### 🌟 Ready to upgrade your browser?
 
   <p align="center">
-    <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0">
-      <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-OPEN_v2.4.0_FOLDER-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started with v2.4.0" />
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
+      <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-FREE_DOWNLOAD-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started with v2.4.0" />
     </a>
   </p>
 
