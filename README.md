@@ -10,16 +10,6 @@
     Chat with any webpage • 1-Click ATS Job & Form Autofill • Video Sniffer • Ad Blocker • Clean Copy & Video OCR
   </p>
 
-  <!-- ── LIVE PRODUCT SHOWCASE / AD BANNER ── -->
-  <p align="center">
-    <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0" title="Go to Z-Pilot Extension Folder">
-      <img src="assets/z-pilot-live-showcase.jpg" width="100%" alt="Z-Pilot AI Browser Agent - Live LinkedIn Job Autofill & AI Copilot" style="max-width: 900px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 36px rgba(0,0,0,0.5);" />
-    </a>
-  </p>
-  <p align="center">
-    <sub>⚡ <b>Live In Action:</b> Browsing jobs on LinkedIn with instant 1-Click AI Form Autofill, Resume &amp; Photo Auto-Attach, and Sidepanel Copilot.</sub>
-  </p>
-
   <p align="center">
     <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0">
       <img src="https://img.shields.io/badge/⬇️_GET_Z--PILOT_v2.4.0-(FOLDER)-ea580c?style=for-the-badge&logo=googlechrome&logoColor=white" height="42" alt="Get Z-Pilot v2.4.0 Folder" />
@@ -41,6 +31,17 @@
     <a href="#-quick-install-1-click-drag--drop"><b>🚀 1-Click Install</b></a> &nbsp;•&nbsp;
     <a href="#-get-free-ai-key"><b>🔑 Free AI Key</b></a> &nbsp;•&nbsp;
     <a href="#-faq"><b>❓ FAQ</b></a>
+  </p>
+
+  <p align="center">
+    <sub>⚡ <b>Live In Action:</b> Browsing jobs on LinkedIn with instant 1-Click AI Form Autofill, Resume &amp; Photo Auto-Attach, and Sidepanel Copilot.</sub>
+  </p>
+
+  <!-- ── LIVE PRODUCT SHOWCASE / AD BANNER ── -->
+  <p align="center">
+    <a href="https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0" title="Go to Z-Pilot Extension Folder">
+      <img src="assets/z-pilot-live-showcase.jpg" width="100%" alt="Z-Pilot AI Browser Agent - Live LinkedIn Job Autofill & AI Copilot" style="max-width: 900px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 36px rgba(0,0,0,0.5);" />
+    </a>
   </p>
 
 </div>
