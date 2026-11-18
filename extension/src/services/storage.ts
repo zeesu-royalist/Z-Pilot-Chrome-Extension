@@ -1,4 +1,4 @@
-import { CalculationRecord, ChatMessage, CleanCopyOcrPreferences, ClipItem, ConverterPreferences, ExchangeRatesData, FriendChatMessage, FriendChatSessionState, PrivacyBlurPreferences, QuickNote, SavedTranslation, ShoppingPreferences, TodoItem, TodoPriority, TrackedProduct, UserProfile, UserSettings } from '../types/index.js';
+import { CalculationRecord, ChatMessage, CleanCopyOcrPreferences, ClipItem, ConverterPreferences, ExchangeRatesData, FriendChatMessage, FriendChatSessionState, PriceHistoryPoint, PrivacyBlurPreferences, QuickNote, SavedTranslation, ShoppingPreferences, TodoItem, TodoPriority, TrackedProduct, UserProfile, UserSettings } from '../types/index.js';
 
 const STORAGE_KEYS = {
   MESSAGES: 'zpilot_messages',
@@ -18,6 +18,7 @@ const STORAGE_KEYS = {
   PRIVACY_BLUR_PREFS: 'zpilot_privacy_blur_prefs',
   TRACKED_PRODUCTS: 'zpilot_tracked_products',
   SHOPPING_PREFERENCES: 'zpilot_shopping_preferences',
+  PRICE_HISTORY_CACHE: 'zpilot_price_history_cache',
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -1063,6 +1064,45 @@ export const StorageService = {
     const updated = existing.map((p) => (p.id === id ? { ...p, ...updates } : p));
     await this.saveTrackedProducts(updated);
     return updated;
+  },
+
+  // ── Auto-Saved Price History Cache for All Visited Products ──
+
+  async getCachedProductPrice(productKey: string): Promise<{ history: PriceHistoryPoint[]; lastPrice?: number } | null> {
+    try {
+      const sanitizedKey = `${STORAGE_KEYS.PRICE_HISTORY_CACHE}_${productKey.slice(0, 100)}`;
+      if (isExtensionEnvironment()) {
+        const res = await chrome.storage.local.get(sanitizedKey);
+        return res[sanitizedKey] || null;
+      } else {
+        const item = localStorage.getItem(sanitizedKey);
+        return item ? JSON.parse(item) : null;
+      }
+    } catch {
+      return null;
+    }
+  },
+
+  async saveCachedProductPrice(
+    productKey: string,
+    history: PriceHistoryPoint[],
+    lastPrice: number
+  ): Promise<void> {
+    try {
+      const sanitizedKey = `${STORAGE_KEYS.PRICE_HISTORY_CACHE}_${productKey.slice(0, 100)}`;
+      const payload = {
+        history,
+        lastPrice,
+        lastChecked: Date.now(),
+      };
+      if (isExtensionEnvironment()) {
+        await chrome.storage.local.set({ [sanitizedKey]: payload });
+      } else {
+        localStorage.setItem(sanitizedKey, JSON.stringify(payload));
+      }
+    } catch {
+      // Ignore cache write errors
+    }
   },
 
   // ── Shopping Preferences ──

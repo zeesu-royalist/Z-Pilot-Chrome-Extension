@@ -15,10 +15,20 @@ describe('Smart Shopping Assistant Service Tests', () => {
       expect(res.currency).toBe('$');
     });
 
-    it('parses Indian Rupee (INR) amounts correctly', () => {
+    it('parses Indian Rupee (INR) amounts correctly including multi-comma formatting', () => {
       const res = EcommerceAssistantService.parsePriceString('₹49,990.00');
       expect(res.price).toBe(49990.0);
       expect(res.currency).toBe('₹');
+
+      const multiComma = EcommerceAssistantService.parsePriceString('₹ 1,49,999.00');
+      expect(multiComma.price).toBe(149999.0);
+      expect(multiComma.currency).toBe('₹');
+    });
+
+    it('extracts primary selling price when multiple prices or discount text exist in raw string', () => {
+      const multi = EcommerceAssistantService.parsePriceString('₹999 ₹1,999 (50% off)');
+      expect(multi.price).toBe(999);
+      expect(multi.currency).toBe('₹');
     });
 
     it('parses Euro and British Pound symbols', () => {
@@ -67,6 +77,13 @@ describe('Smart Shopping Assistant Service Tests', () => {
       const deal = EcommerceAssistantService.evaluateDeal(75, 75, 75, 1);
       expect(deal.score).toBe('Current Price');
       expect(deal.advice).toContain('1st recorded price');
+    });
+
+    it('identifies significant discount relative to original list price / MRP as Great Deal', () => {
+      // Selling price 999, lowest 999, highest 999, 1 check, original MRP 1999 (50% off)
+      const deal = EcommerceAssistantService.evaluateDeal(999, 999, 999, 1, 1999);
+      expect(deal.score).toBe('Great Deal');
+      expect(deal.advice).toContain('Save 50%');
     });
   });
 
@@ -120,6 +137,16 @@ describe('Smart Shopping Assistant Service Tests', () => {
       expect(analysis.adjustedRating).toBeLessThan(4.9);
       expect(analysis.redFlags.length).toBeGreaterThan(0);
     });
+
+    it('evaluates authentic aggregate store rating when review comment text is not yet scrolled into DOM', () => {
+      const analysis = EcommerceAssistantService.analyzeReviewsHeuristic([], 4.4, 1500);
+      expect(analysis.trustGrade).toBe('A');
+      expect(analysis.trustScore).toBeGreaterThanOrEqual(80);
+      expect(analysis.originalRating).toBe(4.4);
+      expect(analysis.totalAnalyzed).toBe(1500);
+      expect(analysis.summary).toContain('1,500');
+      expect(analysis.pros.length).toBeGreaterThan(0);
+    });
   });
 
   describe('Coupon Database & Discovery', () => {
@@ -172,6 +199,23 @@ describe('Smart Shopping Assistant Service Tests', () => {
       await StorageService.removeTrackedProduct(tracked.id);
       const afterDelete = await StorageService.getTrackedProducts();
       expect(afterDelete.length).toBe(0);
+    });
+
+    it('initializes highestPrice with originalPrice / MRP when available', () => {
+      const discountedProduct: ProductInfo = {
+        title: 'Mechanical Gaming Keyboard',
+        url: 'https://example.com/keyboard',
+        domain: 'example.com',
+        currentPrice: 99.0,
+        originalPrice: 199.0,
+        currency: '$',
+        rating: 4.8,
+      };
+
+      const tracked = EcommerceAssistantService.createTrackedProduct(discountedProduct);
+      expect(tracked.currentPrice).toBe(99.0);
+      expect(tracked.lowestPrice).toBe(99.0);
+      expect(tracked.highestPrice).toBe(199.0);
     });
   });
 });

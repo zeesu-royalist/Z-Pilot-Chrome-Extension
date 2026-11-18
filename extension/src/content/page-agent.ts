@@ -1548,6 +1548,17 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
         return false;
       }
 
+      case 'SCROLL_TO_REVIEWS': {
+        scrollToReviewsAndExtract()
+          .then((product) => {
+            sendResponse({ ok: true, product });
+          })
+          .catch((err: unknown) => {
+            sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err) });
+          });
+        return true; // asynchronous response
+      }
+
       case 'EXTRACT_PAGE_COUPONS': {
         try {
           const coupons = extractOnPageCoupons();
@@ -1697,16 +1708,44 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
   // --------------------------------------------------------------------------
   // E-Commerce Product & Review Extractor
   // --------------------------------------------------------------------------
+  async function scrollToReviewsAndExtract() {
+    const reviewTarget = document.querySelector(
+      '#customer-reviews, #reviews, #reviews-medley-footer, [data-hook="reviews-medley-footer"], #customerReviews, .reviews-section, .customer-reviews, [id*="customer-review"], [id*="review-section"], div._2w5Brp, div.ZmyHeo, div.user-review-reviewTextWrapper'
+    );
+    if (reviewTarget) {
+      reviewTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      // Scroll down ~50% where reviews usually load
+      window.scrollTo({ top: document.body.scrollHeight * 0.52, behavior: 'smooth' });
+    }
+    // Wait for lazy-loaded review components to populate
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    return extractPageProductData();
+  }
+
   function extractPageProductData() {
     const url = window.location.href;
     const domain = window.location.hostname.replace(/^www\./, '');
 
     let title = '';
     let rawPriceText = '';
+    let rawListPriceText = '';
+    let rawLowPriceText = '';
     let imageUrl = '';
     let rating: number | undefined;
     let reviewCount: number | undefined;
     const pageReviews: string[] = [];
+
+    // Helper: Flatten structured data from JSON-LD (@graph, arrays, nested objects)
+    const flattenEntities = (obj: any): any[] => {
+      if (!obj || typeof obj !== 'object') return [];
+      if (Array.isArray(obj)) return obj.flatMap(flattenEntities);
+      let list = [obj];
+      if (obj['@graph'] && Array.isArray(obj['@graph'])) {
+        list = list.concat(obj['@graph'].flatMap(flattenEntities));
+      }
+      return list;
+    };
 
     // 1. Try structured JSON-LD first
     try {
@@ -1714,35 +1753,78 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       for (const s of Array.from(scripts)) {
         try {
           const json = JSON.parse(s.textContent || '');
-          const items = Array.isArray(json) ? json : [json];
-          for (const item of items) {
-            if (item['@type'] === 'Product' || item.offers || item.aggregateRating) {
-              if (item.name && !title) title = item.name;
+          const entities = flattenEntities(json);
+          for (const item of entities) {
+            const typeStr = Array.isArray(item['@type'])
+              ? item['@type'].join(' ')
+              : String(item['@type'] || '');
+            const isProduct =
+              /Product|ItemPage|IndividualProduct/i.test(typeStr) ||
+              item.offers ||
+              item.aggregateRating;
+
+            if (isProduct) {
+              if (item.name && !title) title = String(item.name).trim();
+
               if (item.image && !imageUrl) {
-                imageUrl = Array.isArray(item.image)
-                  ? item.image[0]
-                  : typeof item.image === 'string'
-                  ? item.image
-                  : item.image.url || '';
-              }
-              if (item.offers && !rawPriceText) {
-                const offer = Array.isArray(item.offers) ? item.offers[0] : item.offers;
-                if (offer?.price) {
-                  rawPriceText = `${offer.priceCurrency || '$'} ${offer.price}`;
+                if (Array.isArray(item.image)) {
+                  imageUrl =
+                    typeof item.image[0] === 'string'
+                      ? item.image[0]
+                      : item.image[0]?.url || '';
+                } else if (typeof item.image === 'string') {
+                  imageUrl = item.image;
+                } else if (item.image?.url) {
+                  imageUrl = item.image.url;
                 }
               }
+
+              if (item.offers && (!rawPriceText || !rawListPriceText || !rawLowPriceText)) {
+                const offerList = Array.isArray(item.offers) ? item.offers : [item.offers];
+                for (const off of offerList) {
+                  const currency = off.priceCurrency || item.priceCurrency || '$';
+                  const priceVal = off.price ?? off.priceSpecification?.price;
+                  const lowVal = off.lowPrice ?? off.priceSpecification?.minPrice;
+                  const highVal = off.highPrice ?? off.priceSpecification?.maxPrice;
+
+                  if (priceVal !== undefined && !rawPriceText) {
+                    rawPriceText = `${currency} ${priceVal}`;
+                  } else if (lowVal !== undefined && !rawPriceText) {
+                    rawPriceText = `${currency} ${lowVal}`;
+                  }
+
+                  if (lowVal !== undefined && (!priceVal || Number(lowVal) < Number(priceVal)) && !rawLowPriceText) {
+                    rawLowPriceText = `${currency} ${lowVal}`;
+                  }
+
+                  if (highVal !== undefined && !rawListPriceText) {
+                    rawListPriceText = `${currency} ${highVal}`;
+                  }
+                }
+              }
+
               if (item.aggregateRating) {
                 if (item.aggregateRating.ratingValue && !rating) {
-                  rating = parseFloat(item.aggregateRating.ratingValue);
+                  const rv = parseFloat(item.aggregateRating.ratingValue);
+                  if (!isNaN(rv) && rv > 0 && rv <= 5) rating = rv;
                 }
-                if (item.aggregateRating.reviewCount && !reviewCount) {
-                  reviewCount = parseInt(item.aggregateRating.reviewCount, 10);
+                if (!reviewCount) {
+                  const rc = parseInt(
+                    item.aggregateRating.reviewCount || item.aggregateRating.ratingCount,
+                    10
+                  );
+                  if (!isNaN(rc) && rc > 0) reviewCount = rc;
                 }
               }
-              if (item.review && Array.isArray(item.review)) {
-                item.review.slice(0, 10).forEach((r: any) => {
+
+              if (item.review) {
+                const revList = Array.isArray(item.review) ? item.review : [item.review];
+                revList.slice(0, 15).forEach((r: any) => {
                   const body = r.reviewBody || r.description;
-                  if (body && typeof body === 'string') pageReviews.push(body.trim());
+                  if (body && typeof body === 'string' && body.trim().length > 15) {
+                    const cleaned = body.replace(/\s+/g, ' ').trim();
+                    if (!pageReviews.includes(cleaned)) pageReviews.push(cleaned.slice(0, 500));
+                  }
                 });
               }
             }
@@ -1755,40 +1837,70 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       // Continue
     }
 
-    // 2. OpenGraph Meta Tags
+    // 2. OpenGraph & Microdata Tags
     if (!title) {
       title =
-        (document.querySelector('meta[property="og:title"]') as HTMLMetaElement)?.content || '';
+        (document.querySelector('meta[property="og:title"], meta[name="twitter:title"]') as HTMLMetaElement)?.content || '';
     }
     if (!imageUrl) {
       imageUrl =
-        (document.querySelector('meta[property="og:image"]') as HTMLMetaElement)?.content || '';
+        (document.querySelector('meta[property="og:image"], meta[name="twitter:image"], meta[itemprop="image"]') as HTMLMetaElement)?.content || '';
     }
     if (!rawPriceText) {
-      const ogPrice = (
-        document.querySelector(
-          'meta[property="og:price:amount"], meta[property="product:price:amount"]'
-        ) as HTMLMetaElement
-      )?.content;
-      const ogCurrency =
-        (
-          document.querySelector(
-            'meta[property="og:price:currency"], meta[property="product:price:currency"]'
-          ) as HTMLMetaElement
-        )?.content || '$';
-      if (ogPrice) rawPriceText = `${ogCurrency} ${ogPrice}`;
+      const ogPrice = document.querySelector(
+        'meta[property="product:sale_price:amount"], meta[property="product:price:amount"], meta[property="og:price:amount"], meta[itemprop="price"]'
+      ) as HTMLElement | null;
+      if (ogPrice) {
+        const pVal = ogPrice.getAttribute('content') || ogPrice.textContent?.trim();
+        const cVal =
+          (
+            document.querySelector(
+              'meta[property="product:price:currency"], meta[property="og:price:currency"], meta[itemprop="priceCurrency"]'
+            ) as HTMLElement | null
+          )?.getAttribute('content') || '$';
+        if (pVal) rawPriceText = `${cVal} ${pVal}`;
+      }
+    }
+    if (!rawListPriceText) {
+      const listPriceMeta = document.querySelector(
+        'meta[property="product:original_price:amount"], meta[property="product:regular_price:amount"]'
+      ) as HTMLElement | null;
+      if (listPriceMeta) {
+        const lpVal = listPriceMeta.getAttribute('content') || listPriceMeta.textContent?.trim();
+        if (lpVal) rawListPriceText = `$ ${lpVal}`;
+      }
     }
 
-    // 3. Retailer-Specific Selectors
+    // 3. Retailer-Specific Title Selectors
     if (!title) {
-      const el = document.querySelector(
-        '#productTitle, .product-title, h1[itemprop="name"], .B_NuCI, ._2NKhZn, .x-item-title__mainTitle, .pdp-title, [data-testid="product-title"], h1'
-      );
-      if (el) title = el.textContent?.trim() || '';
-    }
-    if (!title) {
-      const h1 = document.querySelector('h1');
-      if (h1?.textContent) title = h1.textContent.trim();
+      const titleSelectors = [
+        '#productTitle',
+        'span#productTitle',
+        '.product-title',
+        'h1[itemprop="name"]',
+        'h1#main-title',
+        'span.VU-ZEz',
+        'span.B_NuCI',
+        'h1._6EBuvT',
+        'h1.yhB1nd',
+        '._2NKhZn',
+        '.x-item-title__mainTitle',
+        '.pdp-title',
+        'h1.pdp-name',
+        'h1.prod-title',
+        '[data-testid="product-title"]',
+        'h1[data-test="product-title"]',
+        '.product__title',
+        '.product-name',
+        'h1',
+      ];
+      for (const sel of titleSelectors) {
+        const el = document.querySelector(sel);
+        if (el?.textContent?.trim()) {
+          title = el.textContent.trim();
+          break;
+        }
+      }
     }
     if (!title) title = document.title;
 
@@ -1797,19 +1909,75 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       .replace(/^Amazon\.[a-z.]+\s*:\s*/i, '')
       .replace(/\s*:\s*Amazon\.[a-z.]+.*$/i, '')
       .replace(/\s*-\s*Flipkart\.com.*$/i, '')
+      .replace(/\s*\|\s*Flipkart.*$/i, '')
       .replace(/\s*\|\s*Walmart\.com.*$/i, '')
       .replace(/\s*\|\s*eBay.*$/i, '')
       .replace(/\s*\|\s*Target.*$/i, '')
       .replace(/\s*\|\s*Myntra.*$/i, '')
+      .replace(/\s*\|\s*Meesho.*$/i, '')
       .trim();
 
     // 4. Reliable Selling Price Extraction (Excluding Struck-Through MRP/List Prices)
     if (!rawPriceText) {
-      const prioritySellingPriceEl = document.querySelector(
-        '#corePriceDisplay_desktop_feature_div .a-price:not(.a-text-price) .a-offscreen, #corePrice_desktop .a-price:not(.a-text-price) .a-offscreen, .priceToPay .a-offscreen, #priceblock_dealprice, #priceblock_ourprice, .apexPriceToPay .a-offscreen, #price_inside_buybox, div._30jeq3._16Jk6d, div._30jeq3, .Nx9bqj.CxhGGd, .Nx9bqj, [data-testid="price-wrap"] [itemprop="price"], span[data-seo-id="hero-price"], [data-testid="x-price-primary"] .ux-textspans, .x-price-primary, #prcIsum, .pdp-price strong, .pdp-price, [data-test="product-price"], [data-test="product-price-reduced"], .price--on-sale .price-item--sale, .price-item--sale, .product-price, .price__regular .price-item--regular, span[itemprop="price"], .product__price'
-      );
-      if (prioritySellingPriceEl) {
-        rawPriceText = prioritySellingPriceEl.textContent?.trim() || '';
+      const prioritySellingPriceSelectors = [
+        '#corePriceDisplay_desktop_feature_div .priceToPay .a-offscreen',
+        '#corePriceDisplay_desktop_feature_div .priceToPay span.a-price-whole',
+        '.priceToPay .a-offscreen',
+        '#corePrice_desktop .a-price:not(.a-text-price) .a-offscreen',
+        '.apexPriceToPay .a-offscreen',
+        '#priceblock_dealprice',
+        '#priceblock_ourprice',
+        '#priceblock_saleprice',
+        '#price_inside_buybox',
+        'div.Nx9bqj.CxhGGd',
+        'div.Nx9bqj',
+        'div._30jeq3._16Jk6d',
+        'div._30jeq3',
+        'div._25b18c div:first-child',
+        'span.pdp-price strong',
+        'span.pdp-price',
+        'span.pdp-selling-price',
+        'h4[class*="Price"]',
+        'span.prod-sp',
+        '.prod-sp',
+        'span[data-seo-id="hero-price"]',
+        '[data-testid="price-wrap"] [itemprop="price"]',
+        '[data-testid="x-price-primary"] .ux-textspans',
+        '.x-price-primary',
+        '#prcIsum',
+        'span[data-test="product-price"]',
+        '[data-test="product-price-reduced"]',
+        '.price--on-sale .price-item--sale',
+        '.price-item--sale',
+        '.product-price',
+        '.price__regular .price-item--regular',
+        'span[itemprop="price"]',
+        '.product__price',
+        '[data-product-price]',
+        'span.money',
+      ];
+
+      for (const sel of prioritySellingPriceSelectors) {
+        const els = document.querySelectorAll(sel);
+        for (const el of Array.from(els)) {
+          if (el.closest('.a-text-price, del, s, strike, [class*="strike"], [class*="was-price"], [class*="list-price"]')) {
+            continue;
+          }
+          let txt = el.getAttribute('content') || el.textContent?.trim() || '';
+          if (el.classList.contains('a-price-whole')) {
+            const frac = el.parentElement?.querySelector('.a-price-fraction')?.textContent?.trim() || '';
+            const symbol = el.parentElement?.querySelector('.a-price-symbol')?.textContent?.trim() || '';
+            txt = `${symbol} ${txt.replace(/\.$/, '')}${frac ? '.' + frac : ''}`;
+          }
+          if (txt && /[\$€£₹¥]|(?:INR|USD|EUR|GBP|Rs\.?)/i.test(txt) && /[0-9]/.test(txt)) {
+            rawPriceText = txt;
+            break;
+          } else if (txt && /^[0-9,]+(?:\.[0-9]{2})?$/.test(txt) && parseFloat(txt.replace(/,/g, '')) > 0) {
+            rawPriceText = txt;
+            break;
+          }
+        }
+        if (rawPriceText) break;
       }
     }
 
@@ -1819,65 +1987,263 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
         '.a-price .a-offscreen:not(.a-text-price .a-offscreen), span[itemprop="price"]'
       );
       if (candidate) {
-        rawPriceText = candidate.textContent?.trim() || '';
+        rawPriceText = candidate.getAttribute('content') || candidate.textContent?.trim() || '';
       }
     }
 
     if (!rawPriceText) {
-      // Regex search in leaf nodes inside main container
+      // Fallback search in main container allowing elements with 0-3 children
       const container = document.querySelector('#centerCol, #dp-container, main, [role="main"]') || document.body;
-      const priceCandidates = Array.from(container.querySelectorAll('span, div, p')).filter((el) => {
-        // Exclude struck through elements
+      const candidates = container.querySelectorAll('span, div, p, strong, b');
+      for (const el of Array.from(candidates)) {
         if (el.closest('.a-text-price, del, s, strike, [class*="strike"], [class*="was-price"], [class*="list-price"]')) {
-          return false;
+          continue;
         }
+        if (el.querySelectorAll('*').length > 3) continue;
         const txt = el.textContent?.trim() || '';
-        return /^[\$€£₹¥]\s?[0-9,]+(?:\.[0-9]{2})?$/.test(txt) && el.children.length === 0;
-      });
-      if (priceCandidates.length > 0) {
-        rawPriceText = priceCandidates[0].textContent?.trim() || '';
+        if (txt.length < 35 && /(?:[\$€£₹¥]|(?:INR|USD|EUR|GBP|Rs\.?))\s?[0-9,]+(?:\.[0-9]{2})?/i.test(txt)) {
+          const match = txt.match(/(?:[\$€£₹¥]|(?:INR|USD|EUR|GBP|Rs\.?))\s?[0-9,]+(?:\.[0-9]{2})?/i);
+          if (match) {
+            rawPriceText = match[0];
+            break;
+          }
+        }
       }
     }
 
-    if (!imageUrl) {
-      const imgEl = document.querySelector(
-        '#landingImage, #imgBlkFront, .product-image img, [data-hook="main-image"], ._396cs4, ._53G40d img, .x-photos-min-view img'
-      ) as HTMLImageElement | null;
-      if (imgEl) imageUrl = imgEl.src || imgEl.currentSrc || '';
+    // 5. Original MRP / List Price Extraction (Strikethrough / Was-Price)
+    if (!rawListPriceText) {
+      const listPriceSelectors = [
+        '#corePriceDisplay_desktop_feature_div .basisPrice .a-offscreen',
+        '#corePriceDisplay_desktop_feature_div span.a-text-price .a-offscreen',
+        '#corePrice_desktop .basisPrice .a-offscreen',
+        'span[data-a-strike="true"] .a-offscreen',
+        'span.a-text-price .a-offscreen',
+        '#priceblock_retailprice',
+        'div.yRaY8j.A68aKn',
+        'div.yRaY8j',
+        'div._3I9_wc._2p6lqe',
+        'div._3I9_wc',
+        'div._25b18c div._3I9_wc',
+        'span.pdp-mrp',
+        'span.pdp-mrp s',
+        'p[class*="MutedPrice"]',
+        'span.prod-cp',
+        '.prod-cp',
+        '[data-testid="price-wrap"] [class*="was-price"]',
+        'span[data-test="product-regular-price"]',
+        '.x-additional-info .ux-textspans--STRIKETHROUGH',
+        '.x-text-strike',
+        '.price-item--regular',
+        '.compare-at-price',
+        's.price-item--regular',
+        '.was-price',
+        'del',
+      ];
+
+      for (const sel of listPriceSelectors) {
+        const els = document.querySelectorAll(sel);
+        for (const el of Array.from(els)) {
+          const txt = el.getAttribute('content') || el.textContent?.trim() || '';
+          if (txt && /[0-9]/.test(txt)) {
+            rawListPriceText = txt;
+            break;
+          }
+        }
+        if (rawListPriceText) break;
+      }
     }
 
-    // 5. Authentic Reviews Extraction (Top visible buyer reviews)
+    // 5b. Check store 30-day low / historic lowest price mentioned on page
+    if (!rawLowPriceText) {
+      try {
+        const containerEl = document.querySelector('#centerCol, #dp-container, main') as HTMLElement | null;
+        const pageTextSnippet = (containerEl?.innerText || document.body?.innerText || '').slice(0, 8000);
+        const lowMatch = pageTextSnippet.match(/(?:lowest price in (?:the last |last |past )?30 days|lowest price in 30 days was|30-day low)[^0-9₹$€£\n]*([₹$€£]?\s?[0-9,]+(?:\.[0-9]{2})?)/i);
+        if (lowMatch && lowMatch[1] && /[0-9]/.test(lowMatch[1])) {
+          rawLowPriceText = lowMatch[1].trim();
+        }
+      } catch {
+        // Continue
+      }
+    }
+
+    // 6. Image Extraction
+    if (!imageUrl) {
+      const imgSelectors = [
+        '#landingImage',
+        '#imgBlkFront',
+        'img.DByuf4',
+        'img._396cs4',
+        'img._2r_T1I',
+        'img._53G40d',
+        '.product-image img',
+        '[data-hook="main-image"]',
+        '.x-photos-min-view img',
+        '.pdp-image img',
+        '.product-single__photo',
+        'img[itemprop="image"]',
+      ];
+      for (const sel of imgSelectors) {
+        const imgEl = document.querySelector(sel) as HTMLImageElement | null;
+        if (imgEl) {
+          const src =
+            imgEl.getAttribute('data-old-hires') ||
+            imgEl.src ||
+            imgEl.currentSrc ||
+            imgEl.getAttribute('data-src') ||
+            '';
+          if (src && !src.startsWith('data:image/svg')) {
+            imageUrl = src;
+            break;
+          }
+        }
+      }
+    }
+
+    // 7. Authentic Customer Reviews Extraction (Top visible buyer reviews)
     if (pageReviews.length === 0) {
       const reviewEls = document.querySelectorAll(
-        'div[data-hook="review-collapsed"] span, div[data-hook="review-body"] span, .review-text-content span, [data-hook="review-body"], div._6K-7Co, div.ZmyHeo div, div._27M-vq, div[data-automation-id="review-text"], .spr-review-content-body, .jdgm-rev__body, .yotpo-review-wrapper, .customer-review, .user-review, [class*="review-content"]'
+        'div[data-hook="review"] span[data-hook="review-body"] span, span[data-hook="review-body"] span, div[data-hook="review-collapsed"] span, .review-text-content span, [data-hook="review-body"], div.ZmyHeo div, div.EPCmJX, div._6K-7Co, div.row div.col div.text, div[class*="review-description"], div.user-review-reviewTextWrapper, div.user-review-reviewText, [data-automation-id="review-text"], [data-testid="review-text"], .spr-review-content-body, .jdgm-rev__body, .stamped-review-body, .yotpo-review-wrapper .content-review, .loox-review-content, [itemprop="reviewBody"], [class*="review-content"], [class*="review-text"], [class*="ReviewText"], .customer-review, .user-review'
       );
       reviewEls.forEach((el) => {
         const text = el.textContent?.replace(/\s+/g, ' ')?.trim();
-        if (text && text.length > 20 && !pageReviews.includes(text) && pageReviews.length < 15) {
+        if (text && text.length > 20 && !pageReviews.includes(text) && pageReviews.length < 20) {
           pageReviews.push(text.slice(0, 500));
         }
       });
     }
 
-    // 6. Rating Extraction
+    // 8. Rating Extraction (DOM + Attributes: title, content, aria-label)
     if (!rating) {
-      const ratingEl = document.querySelector(
-        '#acrPopover, [data-hook="rating-out-of-text"], i.a-icon-star span.a-icon-alt, div._3LWZlK, div.XQDdHH, span.rating-number, [data-testid="item-review-section"], [itemprop="ratingValue"]'
-      );
-      if (ratingEl) {
-        const match = ratingEl.textContent?.match(/([0-9]+(?:\.[0-9]+)?)/);
-        if (match) rating = parseFloat(match[1]);
+      const ratingSelectors = [
+        '#acrPopover',
+        'i.a-icon-star span.a-icon-alt',
+        'span.a-icon-alt',
+        '[data-hook="rating-out-of-text"]',
+        '#averageCustomerReviews .a-color-base',
+        'div.XQDdHH',
+        'div._3LWZlK',
+        'div._2d4LTz',
+        'span._1lRcqv',
+        '[id*="productRating"]',
+        'div.index-overallRating div',
+        'span[class*="RatingValue"]',
+        'div[class*="RatingBadge"]',
+        'span[itemprop="ratingValue"]',
+        'span.rating-number',
+        '[data-testid="reviews-and-ratings"] span',
+        'span[data-test="rating-value"]',
+        '.x-star-rating .ux-textspans',
+        '[data-testid="x-star-rating"]',
+        'strong.overview-rating-average',
+        '[data-rating]',
+        '[data-star-rating]',
+      ];
+
+      for (const sel of ratingSelectors) {
+        const els = document.querySelectorAll(sel);
+        for (const el of Array.from(els)) {
+          const rawVal =
+            el.getAttribute('data-star-rating') ||
+            el.getAttribute('data-rating') ||
+            el.getAttribute('title') ||
+            el.getAttribute('aria-label') ||
+            el.getAttribute('content') ||
+            el.textContent ||
+            '';
+          const match = rawVal.match(/([0-5](?:\.[0-9]+)?)(?:\s*(?:out of|\/)\s*5|\s*stars?)?/i);
+          if (match) {
+            const parsed = parseFloat(match[1]);
+            if (parsed >= 1 && parsed <= 5) {
+              rating = parsed;
+              break;
+            }
+          }
+        }
+        if (rating) break;
       }
     }
 
-    // 7. Review Count Extraction
+    // 9. Review Count Extraction (Numbers, Commas & 'k' notation e.g. 1.2k)
     if (!reviewCount) {
-      const countEl = document.querySelector(
-        '#acrCustomerReviewText, [data-hook="total-review-count"], span._2_R_DZ, span.Wphh3K, [data-testid="review-count"], [itemprop="reviewCount"]'
-      );
-      if (countEl) {
-        const match = countEl.textContent?.replace(/,/g, '')?.match(/([0-9]+)/);
-        if (match) reviewCount = parseInt(match[1], 10);
+      const countSelectors = [
+        '#acrCustomerReviewText',
+        '[data-hook="total-review-count"]',
+        'span.Wphh3K',
+        'span._2_R_DZ',
+        'div.index-ratingsCount',
+        'span[class*="ReviewsCount"]',
+        'span[itemprop="reviewCount"]',
+        'span[itemprop="ratingCount"]',
+        'a[data-testid="item-review-section-link"]',
+        'span[data-test="ratings-and-reviews-count"]',
+        '.ebay-review-count',
+        'span.reviewer--reviews--',
+        '[data-review-count]',
+      ];
+
+      for (const sel of countSelectors) {
+        const els = document.querySelectorAll(sel);
+        for (const el of Array.from(els)) {
+          const rawVal =
+            el.getAttribute('data-review-count') ||
+            el.getAttribute('content') ||
+            el.getAttribute('aria-label') ||
+            el.textContent ||
+            '';
+          if (!rawVal.trim()) continue;
+          const kMatch = rawVal.match(/([0-9]+(?:\.[0-9]+)?)\s*k\b/i);
+          if (kMatch) {
+            reviewCount = Math.round(parseFloat(kMatch[1]) * 1000);
+            break;
+          }
+          const numMatch = rawVal.replace(/,/g, '').match(/([0-9]+)/);
+          if (numMatch) {
+            const parsed = parseInt(numMatch[1], 10);
+            if (parsed > 0) {
+              reviewCount = parsed;
+              break;
+            }
+          }
+        }
+        if (reviewCount) break;
+      }
+    }
+
+    // 10. On-page Deal Badges (e.g. "Lowest price in 30 days", "Limited time deal")
+    let dealBadge: string | undefined;
+    const badgeSelectors = [
+      'span.a-badge-text',
+      '[data-a-badge-type="deal"] span',
+      '.dealBadgeSupportingText',
+      'div._3Ay6Sb span',
+      'span.pdp-offers-offerDesc',
+      '[data-test="badge"]',
+      '.badge--sale',
+      'span[class*="deal-badge"]',
+      'span[class*="discount"]',
+    ];
+    for (const sel of badgeSelectors) {
+      const el = document.querySelector(sel);
+      if (el) {
+        const bText = el.textContent?.trim() || '';
+        if (bText && bText.length < 50) {
+          dealBadge = bText;
+          break;
+        }
+      }
+    }
+
+    if (!dealBadge) {
+      try {
+        const snippet = document.body.innerText.slice(0, 8000);
+        const lowDealMatch = snippet.match(/(lowest price in (?:the last |last |past )?30 days|limited time deal|deal of the day)/i);
+        if (lowDealMatch) {
+          dealBadge = lowDealMatch[1].trim();
+        }
+      } catch {
+        // Continue
       }
     }
 
@@ -1887,8 +2253,11 @@ if (!(window as unknown as { __Z_PILOT_PAGE_AGENT_LOADED?: boolean }).__Z_PILOT_
       domain,
       imageUrl: imageUrl || undefined,
       rawPriceText,
+      rawListPriceText: rawListPriceText || undefined,
+      rawLowPriceText: rawLowPriceText || undefined,
       rating: rating || undefined,
       reviewCount: reviewCount || undefined,
+      dealBadge: dealBadge || undefined,
       pageReviews,
     };
   }

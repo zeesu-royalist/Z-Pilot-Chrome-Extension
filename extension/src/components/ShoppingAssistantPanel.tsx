@@ -60,6 +60,7 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
   const [targetPriceInput, setTargetPriceInput] = useState<string>('');
   const [trackedProducts, setTrackedProducts] = useState<TrackedProduct[]>([]);
   const [isTrackedCurrent, setIsTrackedCurrent] = useState<boolean>(false);
+  const [lastRecordedPrice, setLastRecordedPrice] = useState<number | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Live active tab URL and title
@@ -83,37 +84,60 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
     }
   }, [product?.url, liveUrl, currentPageUrl]);
 
-  // Query live active tab in current window
+  // Query live active tab in current window with comprehensive fallbacks
   const getActiveTab = async (): Promise<chrome.tabs.Tab | null> => {
     try {
       if (typeof chrome === 'undefined' || !chrome.tabs?.query) return null;
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      return tab || null;
+      let tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tabs || tabs.length === 0) {
+        tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      }
+      if (!tabs || tabs.length === 0) {
+        tabs = await chrome.tabs.query({ active: true });
+      }
+      return tabs?.[0] || null;
     } catch {
       return null;
     }
   };
 
-  // Helper to send message to active tab
+  // Helper to send message to active tab with auto-injection fallback
   const sendToTab = async (message: Record<string, unknown>, tabId?: number): Promise<any> => {
     try {
       if (typeof chrome === 'undefined' || !chrome.tabs?.sendMessage) return null;
       let targetId = tabId;
-      if (!targetId && chrome.tabs?.query) {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!targetId) {
+        const tab = await getActiveTab();
         targetId = tab?.id;
       }
       if (!targetId) return null;
 
-      return new Promise((resolve) => {
-        chrome.tabs.sendMessage(targetId as number, message, (res) => {
-          if (chrome.runtime.lastError) {
-            resolve(null);
-          } else {
-            resolve(res);
-          }
+      const doSend = (): Promise<any> =>
+        new Promise((resolve) => {
+          chrome.tabs.sendMessage(targetId as number, message, (res) => {
+            if (chrome.runtime.lastError) {
+              resolve(null);
+            } else {
+              resolve(res);
+            }
+          });
         });
-      });
+
+      let res = await doSend();
+      // If message failed (e.g. content script not yet injected), attempt injecting content.js
+      if (!res && typeof chrome !== 'undefined' && chrome.scripting?.executeScript) {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: targetId },
+            files: ['content.js'],
+          });
+          await new Promise((r) => setTimeout(r, 200));
+          res = await doSend();
+        } catch {
+          // Ignore injection errors
+        }
+      }
+      return res;
     } catch {
       return null;
     }
@@ -142,6 +166,10 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
         // Ignore URL parse error
       }
 
+      // Always reload fresh tracked products from storage
+      const freshTracked = await StorageService.getTrackedProducts();
+      setTrackedProducts(freshTracked);
+
       // 1. Fetch DOM product info from content script
       let res = await sendToTab({ type: 'DETECT_ECOMMERCE_PRODUCT' }, activeTab?.id);
 
@@ -156,11 +184,27 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
       let parsedProduct: ProductInfo | null = null;
       const rawProduct = res?.product;
 
-      // STRICT: Only treat as real product if a genuine price or title exists on page
+      // Extract selling price & list price
       if (rawProduct && rawProduct.rawPriceText) {
         const { price, currency } = EcommerceAssistantService.parsePriceString(
           rawProduct.rawPriceText
         );
+
+        let originalPrice: number | undefined;
+        if (rawProduct.rawListPriceText) {
+          const orig = EcommerceAssistantService.parsePriceString(rawProduct.rawListPriceText);
+          if (orig.price > 0 && orig.price > price) {
+            originalPrice = orig.price;
+          }
+        }
+
+        let lowestPriceObserved: number | undefined;
+        if (rawProduct.rawLowPriceText) {
+          const parsedLow = EcommerceAssistantService.parsePriceString(rawProduct.rawLowPriceText);
+          if (parsedLow.price > 0 && parsedLow.price < price) {
+            lowestPriceObserved = parsedLow.price;
+          }
+        }
 
         if (price > 0) {
           parsedProduct = {
@@ -169,32 +213,77 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
             domain: rawProduct.domain || targetDomain || 'store',
             imageUrl: rawProduct.imageUrl,
             currentPrice: price,
+            originalPrice,
+            lowestPrice: lowestPriceObserved,
             currency: currency || '$',
             rating: rawProduct.rating,
             reviewCount: rawProduct.reviewCount,
+            dealBadge: rawProduct.dealBadge,
             pageReviews: rawProduct.pageReviews || [],
+            rawPriceText: rawProduct.rawPriceText,
+            rawListPriceText: rawProduct.rawListPriceText,
+            rawLowPriceText: rawProduct.rawLowPriceText,
           };
         }
       }
 
       if (parsedProduct) {
-        // Check if tracked
-        const existingTracked = trackedProducts.find(
+        // Derive clean product cache key (with ASIN / PID detection for Amazon & Flipkart)
+        let productKey = `${parsedProduct.domain}_${(parsedProduct.url || '').split('?')[0].replace(/^https?:\/\//, '')}`;
+        const asinMatch = (parsedProduct.url || '').match(/\/(?:dp|gp\/product)\/([A-Za-z0-9]{10})/i);
+        const fkpMatch =
+          (parsedProduct.url || '').match(/[?&]pid=([A-Za-z0-9]+)/i) ||
+          (parsedProduct.url || '').match(/\/p\/([a-zA-Z0-9]+)/i);
+        if (asinMatch) {
+          productKey = `${parsedProduct.domain}_asin_${asinMatch[1]}`;
+        } else if (fkpMatch) {
+          productKey = `${parsedProduct.domain}_pid_${fkpMatch[1]}`;
+        }
+
+        // Retrieve automatic persistent price cache
+        const cached = await StorageService.getCachedProductPrice(productKey);
+
+        // Check if tracked in wishlist
+        const existingTracked = freshTracked.find(
           (p) => p.url === parsedProduct.url || (p.title === parsedProduct.title && p.domain === parsedProduct.domain)
         );
 
-        // 1. Authentic Price History (zero fabricated past points)
+        // Determine last recorded price from previous check (tracked or cached)
+        const previousPrice = existingTracked?.currentPrice || cached?.lastPrice;
+        if (previousPrice && previousPrice !== parsedProduct.currentPrice) {
+          setLastRecordedPrice(previousPrice);
+        } else if (previousPrice) {
+          setLastRecordedPrice(previousPrice);
+        } else {
+          setLastRecordedPrice(null);
+        }
+
+        // Combine history from tracked wishlist or persistent cache
+        const existingHistory = existingTracked?.history || cached?.history;
         const history = EcommerceAssistantService.getAuthenticPriceHistory(
           parsedProduct.currentPrice,
-          existingTracked?.history
+          existingHistory
         );
+
+        // Auto-save observation to persistent cache so history grows naturally across visits!
+        void StorageService.saveCachedProductPrice(productKey, history, parsedProduct.currentPrice);
 
         if (existingTracked) {
           const prices = history.map((h) => h.price);
+          const allHighs = [
+            ...prices,
+            existingTracked.highestPrice || 0,
+            parsedProduct.originalPrice || 0,
+          ].filter(Boolean);
+          const allLows = [
+            ...prices,
+            existingTracked.lowestPrice || Infinity,
+          ].filter(Boolean);
+
           void StorageService.updateTrackedProduct(existingTracked.id, {
             currentPrice: parsedProduct.currentPrice,
-            lowestPrice: Math.min(...prices),
-            highestPrice: Math.max(...prices),
+            lowestPrice: Math.min(...allLows),
+            highestPrice: Math.max(...allHighs),
             history,
             lastChecked: Date.now(),
           }).then((updatedList) => {
@@ -226,7 +315,7 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
             : Math.round(parsedProduct.currentPrice * 0.9 * 100) / 100 + ''
         );
 
-        // 2. Authentic Reviews (strictly only visible on-page reviews)
+        // 2. Authentic Reviews (strictly only visible on-page reviews & ratings)
         const analysis = EcommerceAssistantService.analyzeReviewsHeuristic(
           parsedProduct.pageReviews,
           parsedProduct.rating,
@@ -244,7 +333,7 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
 
         if (isManualClick) {
           const domainLabel = parsedProduct.domain ? ` (${parsedProduct.domain})` : '';
-          setStatusMessage(`✓ Authentic scan: ${parsedProduct.title.slice(0, 30)}...${domainLabel}`);
+          setStatusMessage(`✓ Refreshed & verified: ${parsedProduct.title.slice(0, 30)}...${domainLabel}`);
           setTimeout(() => setStatusMessage(null), 2500);
         }
       } else {
@@ -253,6 +342,7 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
         setPriceHistory([]);
         setReviewAnalysis(null);
         setCoupons([]);
+        setLastRecordedPrice(null);
         if (isManualClick) {
           setStatusMessage('No product or pricing found on this page.');
           setTimeout(() => setStatusMessage(null), 2500);
@@ -266,6 +356,47 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
     } finally {
       setIsScanning(false);
       setIsLoading(false);
+    }
+  };
+
+  // Scroll down to customer reviews and re-analyze
+  const handleScrollToReviews = async () => {
+    setIsScanning(true);
+    setStatusMessage('📜 Scrolling down to reviews section...');
+    try {
+      const activeTab = await getActiveTab();
+      const res = await sendToTab({ type: 'SCROLL_TO_REVIEWS' }, activeTab?.id);
+      if (res?.product && res.product.pageReviews) {
+        const rawReviews = res.product.pageReviews;
+        setProduct((prev) =>
+          prev
+            ? {
+                ...prev,
+                pageReviews: rawReviews,
+                rating: res.product.rating || prev.rating,
+                reviewCount: res.product.reviewCount || prev.reviewCount,
+              }
+            : prev
+        );
+        const updatedAnalysis = EcommerceAssistantService.analyzeReviewsHeuristic(
+          rawReviews,
+          res.product.rating || product?.rating,
+          res.product.reviewCount || product?.reviewCount
+        );
+        setReviewAnalysis(updatedAnalysis);
+        setStatusMessage(
+          rawReviews.length > 0
+            ? `✓ Loaded & analyzed ${rawReviews.length} live buyer reviews!`
+            : '✓ Reviews scanned'
+        );
+        setTimeout(() => setStatusMessage(null), 2500);
+      } else {
+        await scanCurrentPage(true);
+      }
+    } catch {
+      await scanCurrentPage(true);
+    } finally {
+      setIsScanning(false);
     }
   };
 
@@ -348,6 +479,9 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
   const handleTabChange = (tab: ShoppingTab) => {
     setActiveTab(tab);
     void StorageService.saveShoppingPreferences({ activeTab: tab });
+    if (tab === 'fake_reviews' && product && (!product.pageReviews || product.pageReviews.length === 0)) {
+      void handleScrollToReviews();
+    }
   };
 
   // Toggle Price Drop Tracking
@@ -417,14 +551,21 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
 
   // Price calculations
   const prices = priceHistory.map((p) => p.price);
-  const lowestPrice = prices.length > 0 ? Math.min(...prices) : (product?.currentPrice || 0);
-  const highestPrice = prices.length > 0 ? Math.max(...prices) : (product?.currentPrice || 0);
+  if (product?.lowestPrice && product.lowestPrice > 0) {
+    prices.push(product.lowestPrice);
+  }
+  const lowestPrice = prices.length > 0 ? Math.min(...prices) : product?.currentPrice || 0;
+  const highestPrice =
+    prices.length > 0
+      ? Math.max(...prices, product?.originalPrice || 0)
+      : Math.max(product?.currentPrice || 0, product?.originalPrice || 0);
   const dealEvaluation = product
     ? EcommerceAssistantService.evaluateDeal(
         product.currentPrice,
         lowestPrice,
         highestPrice,
-        priceHistory.length
+        priceHistory.length,
+        product.originalPrice
       )
     : { score: 'Current Price' as const, color: 'text-zinc-400', advice: 'No product detected.' };
 
@@ -501,8 +642,14 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
                       <Store className="w-3 h-3 text-orange-400 shrink-0" />
                       <span className="font-semibold text-zinc-300 truncate">{product.domain}</span>
                       {product.rating && (
-                        <span className="flex items-center text-amber-300 bg-amber-500/15 px-1.5 py-0.2 rounded font-mono font-bold text-[9.5px] shrink-0">
-                          ★ {product.rating}
+                        <span className="flex items-center space-x-1 text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono font-bold text-[10px] shrink-0">
+                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                          <span>{product.rating}</span>
+                          {product.reviewCount && (
+                            <span className="text-zinc-400 font-normal text-[9px]">
+                              ({product.reviewCount >= 1000 ? `${(product.reviewCount / 1000).toFixed(1)}k` : product.reviewCount})
+                            </span>
+                          )}
                         </span>
                       )}
                     </div>
@@ -572,7 +719,7 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
                 }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Fake Reviews</span>
+                <span>Customer Reviews</span>
               </button>
 
               <button
@@ -599,31 +746,114 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
               <div className="space-y-3 animate-fade-in">
                 {/* 3 Price Stat Badges */}
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="p-2.5 rounded-xl bg-black/40 border border-emerald-500/30 text-center">
-                    <span className="text-[10px] text-emerald-400 font-semibold block">Lowest Price</span>
-                    <span className="text-sm font-bold font-mono text-emerald-300">
-                      {EcommerceAssistantService.formatPrice(lowestPrice, product.currency)}
-                    </span>
-                  </div>
+                  {lowestPrice < product.currentPrice ? (
+                    <>
+                      {/* Card 1: Lowest Recorded Price */}
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-emerald-500/30 text-center">
+                        <span className="text-[10px] text-emerald-400 font-semibold block">Lowest Price</span>
+                        <span className="text-sm font-bold font-mono text-emerald-300">
+                          {EcommerceAssistantService.formatPrice(lowestPrice, product.currency)}
+                        </span>
+                        <span className="text-[9px] text-zinc-400 block mt-0.5">Lowest recorded</span>
+                      </div>
 
-                  <div className="p-2.5 rounded-xl bg-black/40 border border-orange-500/30 text-center">
-                    <span className="text-[10px] text-orange-400 font-semibold block">Current Price</span>
-                    <span className="text-sm font-bold font-mono text-orange-300">
-                      {EcommerceAssistantService.formatPrice(product.currentPrice, product.currency)}
-                    </span>
-                  </div>
+                      {/* Card 2: Current Deal Price */}
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-orange-500/30 text-center">
+                        <span className="text-[10px] text-orange-400 font-semibold block">Current Price</span>
+                        <span className="text-sm font-bold font-mono text-orange-300">
+                          {EcommerceAssistantService.formatPrice(product.currentPrice, product.currency)}
+                        </span>
+                        <span className="text-[9px] text-amber-400/90 font-medium block mt-0.5">
+                          +{EcommerceAssistantService.formatPrice(product.currentPrice - lowestPrice, product.currency)} above low
+                        </span>
+                      </div>
 
-                  <div className="p-2.5 rounded-xl bg-black/40 border border-red-500/30 text-center">
-                    <span className="text-[10px] text-red-400 font-semibold block">
-                      {priceHistory.length > 1 ? 'Highest Price' : 'Observations'}
-                    </span>
-                    <span className="text-sm font-bold font-mono text-red-300">
-                      {priceHistory.length > 1
-                        ? EcommerceAssistantService.formatPrice(highestPrice, product.currency)
-                        : `${priceHistory.length} Check`}
-                    </span>
-                  </div>
+                      {/* Card 3: Highest / MRP */}
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-red-500/30 text-center">
+                        <span className="text-[10px] text-red-400 font-semibold block">
+                          {highestPrice > product.currentPrice ? 'Highest / MRP' : 'Highest Price'}
+                        </span>
+                        <span className="text-sm font-bold font-mono text-red-300">
+                          {EcommerceAssistantService.formatPrice(highestPrice, product.currency)}
+                        </span>
+                        {highestPrice > product.currentPrice ? (
+                          <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">
+                            Save {Math.round(((highestPrice - product.currentPrice) / highestPrice) * 100)}% off MRP
+                          </span>
+                        ) : (
+                          <span className="text-[9px] text-zinc-500 block mt-0.5">Peak observed</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Card 1: Current Price (All-Time Low) */}
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-orange-500/30 text-center">
+                        <span className="text-[10px] text-orange-400 font-semibold block">Current Price</span>
+                        <span className="text-sm font-bold font-mono text-orange-300">
+                          {EcommerceAssistantService.formatPrice(product.currentPrice, product.currency)}
+                        </span>
+                        <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">
+                          {product.dealBadge ? product.dealBadge.slice(0, 20) : '🔥 All-Time Low!'}
+                        </span>
+                      </div>
+
+                      {/* Card 2: Total Savings vs MRP */}
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-emerald-500/30 text-center">
+                        <span className="text-[10px] text-emerald-400 font-semibold block">Total Savings</span>
+                        <span className="text-sm font-bold font-mono text-emerald-300">
+                          {highestPrice > product.currentPrice
+                            ? `Save ${EcommerceAssistantService.formatPrice(highestPrice - product.currentPrice, product.currency)}`
+                            : 'Best Price'}
+                        </span>
+                        <span className="text-[9px] text-emerald-400/90 font-medium block mt-0.5">
+                          {highestPrice > product.currentPrice
+                            ? `${Math.round(((highestPrice - product.currentPrice) / highestPrice) * 100)}% Below MRP`
+                            : '1st Price Check'}
+                        </span>
+                      </div>
+
+                      {/* Card 3: Original MRP / List Price */}
+                      <div className="p-2.5 rounded-xl bg-black/40 border border-zinc-700/60 text-center">
+                        <span className="text-[10px] text-zinc-400 font-semibold block">
+                          {highestPrice > product.currentPrice ? 'Original MRP' : 'Price Baseline'}
+                        </span>
+                        <span className="text-sm font-bold font-mono text-zinc-300">
+                          {highestPrice > product.currentPrice
+                            ? EcommerceAssistantService.formatPrice(highestPrice, product.currency)
+                            : `${priceHistory.length} Check`}
+                        </span>
+                        <span className="text-[9px] text-zinc-500 block mt-0.5">
+                          {highestPrice > product.currentPrice ? 'List / MRP' : 'Tracking started'}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
+
+                {/* Last Recorded Price Banner (when previously tracked) */}
+                {lastRecordedPrice !== null && (
+                  <div className="p-2.5 rounded-xl bg-black/40 border border-white/10 flex items-center justify-between text-xs font-mono">
+                    <span className="text-zinc-400 flex items-center space-x-1.5">
+                      <RotateCcw className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Last Checked Price:</span>
+                    </span>
+                    <span className="font-bold text-white">
+                      {EcommerceAssistantService.formatPrice(lastRecordedPrice, product.currency)}
+                      {product.currentPrice < lastRecordedPrice ? (
+                        <span className="text-emerald-400 font-semibold ml-2">
+                          (↓ Dropped by {product.currency}{Math.round((lastRecordedPrice - product.currentPrice) * 100) / 100})
+                        </span>
+                      ) : product.currentPrice > lastRecordedPrice ? (
+                        <span className="text-amber-400 font-semibold ml-2">
+                          (↑ Rose by {product.currency}{Math.round((product.currentPrice - lastRecordedPrice) * 100) / 100})
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400 font-normal ml-2">(Unchanged)</span>
+                      )}
+                    </span>
+                  </div>
+                )}
 
                 {/* Deal Advice Callout */}
                 <div className="p-3 rounded-xl bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-transparent border border-orange-500/30 flex items-center space-x-2.5 text-xs text-orange-200">
@@ -785,154 +1015,167 @@ export const ShoppingAssistantPanel: React.FC<ShoppingAssistantPanelProps> = ({
             {/* ══════════════════════════════════════════════════════════ */}
             {activeTab === 'fake_reviews' && (
               <div className="space-y-3 animate-fade-in">
-                {!reviewAnalysis || reviewAnalysis.totalAnalyzed === 0 ? (
-                  <div className="p-5 rounded-2xl bg-black/50 border border-amber-500/30 text-center space-y-2.5">
-                    <ShieldAlert className="w-9 h-9 text-amber-400 mx-auto" />
-                    <h4 className="text-sm font-bold text-white">No Customer Reviews Found in Page DOM</h4>
-                    <p className="text-xs text-zinc-400 max-w-xs mx-auto leading-relaxed">
-                      Z-Pilot strictly evaluates authentic customer reviews directly from this webpage. Please scroll down to the Customer Reviews section on this page so reviews are loaded into the DOM, then click <strong>Refresh</strong> above.
+                {/* Store Rating & Review Authenticity Overview Card */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-black/60 via-[#180803]/70 to-black/60 border border-orange-500/30 flex items-center justify-between">
+                  <div className="min-w-0 pr-2">
+                    <div className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400 mb-0.5">
+                      Customer Rating & Trust Grade
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1 text-base font-extrabold text-white font-mono">
+                        <Star className="w-4 h-4 fill-amber-400 text-amber-400 shrink-0" />
+                        <span>{product.rating ? `${product.rating} / 5` : reviewAnalysis ? `${reviewAnalysis.originalRating} / 5` : 'Rating not found'}</span>
+                      </div>
+                      {product.reviewCount && (
+                        <span className="text-xs text-zinc-400 font-mono">
+                          • {product.reviewCount.toLocaleString()} Reviews
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm font-bold text-orange-400 mt-1">
+                      {reviewAnalysis?.verdict || 'Store Feedback Verified'}
+                    </div>
+                    <div className="text-[11px] text-zinc-400 mt-0.5 max-w-[240px]">
+                      {reviewAnalysis?.summary || 'Authentic store ratings evaluated from live webpage.'}
+                    </div>
+                  </div>
+
+                  {/* Trust Grade Badge */}
+                  {reviewAnalysis && reviewAnalysis.trustGrade !== 'N/A' && (
+                    <div
+                      className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-bold shadow-lg shrink-0 ${
+                        reviewAnalysis.trustGrade === 'A' || reviewAnalysis.trustGrade === 'B'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
+                          : reviewAnalysis.trustGrade === 'C'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
+                          : 'bg-red-500/20 text-red-300 border border-red-500/50'
+                      }`}
+                    >
+                      <span className="text-xl leading-none">{reviewAnalysis.trustGrade}</span>
+                      <span className="text-[9px] font-mono mt-0.5">{reviewAnalysis.trustScore}% Trust</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Rating Comparison: Listed vs Adjusted */}
+                {reviewAnalysis && reviewAnalysis.trustGrade !== 'N/A' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/10 text-center">
+                      <span className="text-[10px] text-zinc-400 block mb-0.5">Website Listed Rating</span>
+                      <div className="flex items-center justify-center space-x-1 text-sm font-bold text-white font-mono">
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        <span>{product.rating || reviewAnalysis.originalRating} / 5</span>
+                      </div>
+                      <span className="text-[9px] text-zinc-500 mt-0.5 block">Store rating</span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-center">
+                      <span className="text-[10px] text-orange-400 block mb-0.5">Adjusted Real Rating</span>
+                      <div className="flex items-center justify-center space-x-1 text-sm font-bold text-orange-300 font-mono">
+                        <Star className="w-3.5 h-3.5 fill-orange-400 text-orange-400" />
+                        <span>{reviewAnalysis.adjustedRating} / 5</span>
+                      </div>
+                      <span className="text-[9px] text-zinc-400 mt-0.5 block">After authenticity audit</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* If individual comment paragraphs not yet rendered, show 1-click Auto-Scroll action banner */}
+                {(!product.pageReviews || product.pageReviews.length === 0) && (
+                  <div className="p-4 rounded-2xl bg-black/50 border border-amber-500/30 text-center space-y-2">
+                    <ShieldAlert className="w-7 h-7 text-amber-400 mx-auto" />
+                    <h4 className="text-xs font-bold text-white">Review Comment Text Not in DOM Yet</h4>
+                    <p className="text-[11px] text-zinc-400 max-w-xs mx-auto leading-relaxed">
+                      Official store rating was captured successfully. Individual customer review paragraphs load when scrolling. Click below to automatically scroll and analyze buyer comments.
                     </p>
                     <button
                       type="button"
-                      onClick={() => void scanCurrentPage(true)}
+                      onClick={() => void handleScrollToReviews()}
                       disabled={isScanning}
-                      className="mt-1 px-3.5 py-1.5 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 text-orange-300 font-semibold text-xs inline-flex items-center space-x-1.5 cursor-pointer"
+                      className="mt-1 px-3.5 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-500 text-white font-semibold text-xs inline-flex items-center space-x-1.5 cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
                     >
-                      <RotateCcw className={`w-3 h-3 ${isScanning ? 'animate-spin' : ''}`} />
-                      <span>Rescan Page for Reviews</span>
+                      <RotateCcw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+                      <span>{isScanning ? 'Scanning Reviews...' : '📜 Auto-Scroll & Scan Detailed Reviews'}</span>
                     </button>
                   </div>
-                ) : (
-                  <>
-                    {/* Trust Grade Hero Card */}
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-black/60 via-[#180803]/70 to-black/60 border border-orange-500/30 flex items-center justify-between">
-                      <div>
-                        <div className="text-[10.5px] uppercase tracking-wider font-semibold text-zinc-400 mb-0.5">
-                          Review Authenticity Grade
-                        </div>
-                        <div className="text-base font-bold text-white flex items-center space-x-2">
-                          <span>{reviewAnalysis.verdict}</span>
-                        </div>
-                        <div className="text-[11px] text-zinc-400 mt-1 max-w-[240px]">
-                          {reviewAnalysis.summary}
-                        </div>
-                        <div className="text-[10px] text-emerald-400 font-mono mt-1">
-                          ✓ Analyzed {reviewAnalysis.totalAnalyzed} live reviews from page
-                        </div>
-                      </div>
+                )}
 
-                      {/* Big Trust Letter Grade */}
-                      <div
-                        className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center font-bold shadow-lg shrink-0 ${
-                          reviewAnalysis.trustGrade === 'A' || reviewAnalysis.trustGrade === 'B'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
-                            : reviewAnalysis.trustGrade === 'C'
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
-                            : 'bg-red-500/20 text-red-300 border border-red-500/50'
-                        }`}
-                      >
-                        <span className="text-2xl leading-none">{reviewAnalysis.trustGrade}</span>
-                        <span className="text-[9.5px] font-mono mt-0.5">{reviewAnalysis.trustScore}% Real</span>
-                      </div>
-                    </div>
+                {/* Pros & Real Buyer Flaws */}
+                {reviewAnalysis && (reviewAnalysis.pros.length > 0 || reviewAnalysis.cons.length > 0) && (
+                  <div className="p-3.5 rounded-2xl bg-black/50 border border-white/10 space-y-2.5">
+                    <span className="text-[10.5px] font-bold text-white uppercase tracking-wider block">
+                      Verified Buyer Insights
+                    </span>
 
-                    {/* Rating Comparison: Listed vs Adjusted */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="p-3 rounded-xl bg-black/40 border border-white/10 text-center">
-                        <span className="text-[10px] text-zinc-400 block mb-0.5">Website Listed Rating</span>
-                        <div className="flex items-center justify-center space-x-1 text-sm font-bold text-white font-mono">
-                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                          <span>{reviewAnalysis.originalRating} / 5</span>
-                        </div>
-                        <span className="text-[9px] text-zinc-500 mt-0.5 block">Store rating</span>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-center">
-                        <span className="text-[10px] text-orange-400 block mb-0.5">Adjusted Real Rating</span>
-                        <div className="flex items-center justify-center space-x-1 text-sm font-bold text-orange-300 font-mono">
-                          <Star className="w-3.5 h-3.5 fill-orange-400 text-orange-400" />
-                          <span>{reviewAnalysis.adjustedRating} / 5</span>
-                        </div>
-                        <span className="text-[9px] text-zinc-400 mt-0.5 block">After authenticity audit</span>
-                      </div>
-                    </div>
-
-                    {/* Pros & Real Buyer Flaws */}
-                    {(reviewAnalysis.pros.length > 0 || reviewAnalysis.cons.length > 0) && (
-                      <div className="p-3.5 rounded-2xl bg-black/50 border border-white/10 space-y-2.5">
-                        <span className="text-[10.5px] font-bold text-white uppercase tracking-wider block">
-                          Verified Buyer Insights
-                        </span>
-
-                        {reviewAnalysis.pros.length > 0 && (
-                          <div className="space-y-1">
-                            {reviewAnalysis.pros.map((pro, i) => (
-                              <div key={i} className="flex items-start space-x-2 text-xs text-zinc-300">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                                <span>{pro}</span>
-                              </div>
-                            ))}
+                    {reviewAnalysis.pros.length > 0 && (
+                      <div className="space-y-1">
+                        {reviewAnalysis.pros.map((pro, i) => (
+                          <div key={i} className="flex items-start space-x-2 text-xs text-zinc-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                            <span>{pro}</span>
                           </div>
-                        )}
-
-                        {reviewAnalysis.cons.length > 0 && (
-                          <div className="space-y-1 pt-1.5 border-t border-white/10">
-                            {reviewAnalysis.cons.map((con, i) => (
-                              <div key={i} className="flex items-start space-x-2 text-xs text-zinc-300">
-                                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                                <span>{con}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Detected Red Flags */}
-                    <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1.5">
-                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center space-x-1.5">
-                        <ShieldAlert className="w-3.5 h-3.5 text-orange-400" />
-                        <span>Review Authenticity Flags</span>
-                      </span>
-                      <ul className="space-y-1 text-[11px] text-zinc-400 pl-4 list-disc">
-                        {reviewAnalysis.redFlags.map((flag, idx) => (
-                          <li key={idx}>{flag}</li>
                         ))}
-                      </ul>
-                    </div>
-
-                    {/* Real On-Page Review Snippets (Visual Proof) */}
-                    {reviewAnalysis.sampleQuotes && reviewAnalysis.sampleQuotes.length > 0 && (
-                      <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-2">
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
-                          Verified On-Page Review Snippets ({reviewAnalysis.sampleQuotes.length})
-                        </span>
-                        <div className="space-y-1.5">
-                          {reviewAnalysis.sampleQuotes.map((quote, qIdx) => (
-                            <div
-                              key={qIdx}
-                              className="text-[11px] text-zinc-300 italic bg-white/5 p-2 rounded-xl border border-white/5 leading-relaxed"
-                            >
-                              "{quote}"
-                            </div>
-                          ))}
-                        </div>
                       </div>
                     )}
 
-                    {/* AI Deep Analysis Button */}
-                    {geminiApiKey && (
-                      <button
-                        type="button"
-                        onClick={handleRunAiReviewAnalysis}
-                        disabled={isLoading}
-                        className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-orange-500/20 border border-white/10 hover:border-orange-500/40 text-white font-semibold text-xs flex items-center justify-center space-x-2 transition-colors cursor-pointer disabled:opacity-40"
-                      >
-                        <Sparkles className={`w-3.5 h-3.5 text-orange-400 ${isLoading ? 'animate-spin' : ''}`} />
-                        <span>{isLoading ? 'Analyzing Reviews...' : 'Re-Analyze with Gemini AI Vision'}</span>
-                      </button>
+                    {reviewAnalysis.cons.length > 0 && (
+                      <div className="space-y-1 pt-1.5 border-t border-white/10">
+                        {reviewAnalysis.cons.map((con, i) => (
+                          <div key={i} className="flex items-start space-x-2 text-xs text-zinc-300">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                            <span>{con}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
-                  </>
+                  </div>
+                )}
+
+                {/* Detected Red Flags */}
+                {reviewAnalysis && reviewAnalysis.redFlags.length > 0 && (
+                  <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-1.5">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center space-x-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Review Authenticity Flags</span>
+                    </span>
+                    <ul className="space-y-1 text-[11px] text-zinc-400 pl-4 list-disc">
+                      {reviewAnalysis.redFlags.map((flag, idx) => (
+                        <li key={idx}>{flag}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Real On-Page Review Snippets (Visual Proof) */}
+                {reviewAnalysis?.sampleQuotes && reviewAnalysis.sampleQuotes.length > 0 && (
+                  <div className="p-3 rounded-2xl bg-black/40 border border-white/10 space-y-2">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
+                      Verified On-Page Review Snippets ({reviewAnalysis.sampleQuotes.length})
+                    </span>
+                    <div className="space-y-1.5">
+                      {reviewAnalysis.sampleQuotes.map((quote, qIdx) => (
+                        <div
+                          key={qIdx}
+                          className="text-[11px] text-zinc-300 italic bg-white/5 p-2 rounded-xl border border-white/5 leading-relaxed"
+                        >
+                          "{quote}"
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Deep Analysis Button */}
+                {geminiApiKey && product.pageReviews && product.pageReviews.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleRunAiReviewAnalysis}
+                    disabled={isLoading}
+                    className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-orange-500/20 border border-white/10 hover:border-orange-500/40 text-white font-semibold text-xs flex items-center justify-center space-x-2 transition-colors cursor-pointer disabled:opacity-40"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 text-orange-400 ${isLoading ? 'animate-spin' : ''}`} />
+                    <span>{isLoading ? 'Analyzing Reviews...' : 'Re-Analyze with Gemini AI Vision'}</span>
+                  </button>
                 )}
               </div>
             )}

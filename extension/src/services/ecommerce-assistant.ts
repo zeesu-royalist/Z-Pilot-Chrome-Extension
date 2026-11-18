@@ -68,11 +68,15 @@ export class EcommerceAssistantService {
     else if (/CAD/i.test(raw)) currency = 'CA$';
     else if (/AUD/i.test(raw)) currency = 'AU$';
 
+    // If multiple prices or strings exist e.g. "₹999 ₹1,999 (50% off)", extract the first price token
+    const tokenMatch = raw.match(/(?:[\$€£₹¥]|CA\$|AU\$|INR|USD|EUR|GBP)?\s*([0-9][0-9.,]*)/);
+    const candidate = tokenMatch ? tokenMatch[1] : raw;
+
     // Remove currency symbols and non-digits except comma and period
-    const cleaned = raw.replace(/[^0-9.,]/g, '').trim();
+    const cleaned = candidate.replace(/[^0-9.,]/g, '').trim();
     if (!cleaned) return { price: 0, currency };
 
-    // Handle European numbers like "1.299,50" vs US "1,299.50"
+    // Handle European numbers like "1.299,50" or "49,90" vs US/Indian "1,299.50" or "1,49,999.00"
     let numericStr = cleaned;
     if (cleaned.includes(',') && cleaned.includes('.')) {
       if (cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')) {
@@ -84,9 +88,11 @@ export class EcommerceAssistantService {
       }
     } else if (cleaned.includes(',')) {
       const parts = cleaned.split(',');
-      if (parts[parts.length - 1].length === 2) {
+      if (parts.length === 2 && parts[1].length === 2) {
+        // European decimals: e.g. 89,95 -> 89.95
         numericStr = parts[0] + '.' + parts[1];
       } else {
+        // Thousands separator: e.g. 45,000 or 1,49,999 -> 149999
         numericStr = cleaned.replace(/,/g, '');
       }
     }
@@ -116,20 +122,43 @@ export class EcommerceAssistantService {
     currentPrice: number,
     lowestPrice: number,
     highestPrice: number,
-    historyCount = 1
+    historyCount = 1,
+    originalPrice?: number
   ): {
     score: 'Great Deal' | 'Fair Price' | 'High Price' | 'Current Price';
     percentageFromLowest: number;
     color: string;
     advice: string;
   } {
-    if (currentPrice <= 0 || highestPrice <= 0) {
+    if (currentPrice <= 0) {
       return {
         score: 'Current Price',
         percentageFromLowest: 0,
         color: 'text-zinc-400',
         advice: 'Current price observed.',
       };
+    }
+
+    const referenceHigh = Math.max(highestPrice || 0, originalPrice || 0);
+
+    // If MRP/Original list price is detected and significantly higher than selling price
+    if (referenceHigh > currentPrice && (historyCount <= 1 || currentPrice <= lowestPrice * 1.05)) {
+      const discountPercent = Math.round(((referenceHigh - currentPrice) / referenceHigh) * 100);
+      if (discountPercent >= 20) {
+        return {
+          score: 'Great Deal',
+          percentageFromLowest: 0,
+          color: 'text-emerald-400',
+          advice: `Save ${discountPercent}% below original list price / MRP! Excellent buying opportunity.`,
+        };
+      } else if (discountPercent > 5) {
+        return {
+          score: 'Fair Price',
+          percentageFromLowest: 0,
+          color: 'text-orange-400',
+          advice: `Save ${discountPercent}% below list price. Fair deal.`,
+        };
+      }
     }
 
     const priceRange = highestPrice - lowestPrice;
@@ -198,9 +227,10 @@ export class EcommerceAssistantService {
       const lastIndex = history.length - 1;
       const lastPoint = history[lastIndex];
 
-      if (lastPoint.date === todayStr) {
-        history[lastIndex] = { ...lastPoint, price: currentPrice };
+      if (lastPoint.date === todayStr && lastPoint.price === currentPrice) {
+        // Price unchanged today, keep existing observation
       } else {
+        // Price change or new date check: append observation
         history.push({ date: todayStr, price: currentPrice });
       }
 
@@ -244,6 +274,76 @@ export class EcommerceAssistantService {
     reviewCount = 0
   ): FakeReviewAnalysis {
     if (!reviews || reviews.length === 0) {
+      if (originalRating > 0 || reviewCount > 0) {
+        const safeRating = originalRating > 0 ? originalRating : 4.0;
+        const safeCount = reviewCount || 0;
+
+        let trustGrade: 'A' | 'B' | 'C' | 'D' | 'F' = 'A';
+        let verdict: FakeReviewAnalysis['verdict'] = 'Genuine & Reliable';
+        let trustScore = 85;
+
+        if (safeRating >= 4.2 && safeCount >= 50) {
+          trustGrade = 'A';
+          trustScore = 90;
+          verdict = 'Genuine & Reliable';
+        } else if (safeRating >= 3.8) {
+          trustGrade = 'B';
+          trustScore = 78;
+          verdict = 'Genuine & Reliable';
+        } else if (safeRating >= 3.0) {
+          trustGrade = 'C';
+          trustScore = 62;
+          verdict = 'Moderate Concern';
+        } else {
+          trustGrade = 'D';
+          trustScore = 45;
+          verdict = 'High Risk / Likely Inauthentic';
+        }
+
+        const pros: string[] = [
+          `Verified store customer rating: ${safeRating} / 5 stars`,
+        ];
+        if (safeCount > 0) {
+          pros.push(`Based on ${safeCount.toLocaleString()} registered buyer ratings & reviews`);
+        }
+        if (safeRating >= 4.0) {
+          pros.push('High positive buyer satisfaction ratio');
+        }
+
+        const cons: string[] = [];
+        if (safeRating < 3.5 && safeRating > 0) {
+          cons.push('Below-average customer satisfaction rating reported on store');
+        }
+
+        return {
+          trustGrade,
+          trustScore,
+          originalRating: safeRating,
+          adjustedRating: safeRating,
+          suspiciousCount: 0,
+          totalAnalyzed: safeCount,
+          verdict,
+          summary: `Holds a verified ${safeRating} / 5 star rating across ${safeCount ? safeCount.toLocaleString() : 'multiple'} buyer reviews. Click 'Scan Detailed Reviews' to analyze individual buyer review comments.`,
+          pros,
+          cons: cons.length > 0 ? cons : ['No major aggregate red flags detected'],
+          redFlags: ['Individual comment bodies not yet loaded in visible DOM'],
+          metrics: [
+            {
+              name: 'Store Rating Health',
+              score: Math.min(100, Math.round(safeRating * 20)),
+              status: safeRating >= 4.0 ? 'safe' : safeRating >= 3.2 ? 'warning' : 'danger',
+              detail: `${safeRating} / 5 stars recorded on store`,
+            },
+            {
+              name: 'Customer Review Volume',
+              score: safeCount >= 500 ? 95 : safeCount >= 50 ? 80 : 60,
+              status: safeCount >= 50 ? 'safe' : 'warning',
+              detail: `${safeCount.toLocaleString()} total buyer reviews`,
+            },
+          ],
+        };
+      }
+
       return {
         trustGrade: 'N/A',
         trustScore: 0,
@@ -513,6 +613,10 @@ Output strict JSON with this format:
    */
   public static createTrackedProduct(product: ProductInfo, targetPrice?: number): TrackedProduct {
     const history = this.getAuthenticPriceHistory(product.currentPrice);
+    const effectiveHigh = Math.max(
+      product.currentPrice,
+      product.originalPrice || 0
+    );
 
     return {
       id: `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -525,7 +629,7 @@ Output strict JSON with this format:
       currentPrice: product.currentPrice,
       targetPrice: targetPrice || Math.round(product.currentPrice * 0.9 * 100) / 100,
       lowestPrice: product.currentPrice,
-      highestPrice: product.currentPrice,
+      highestPrice: effectiveHigh,
       history,
       dateAdded: Date.now(),
       lastChecked: Date.now(),

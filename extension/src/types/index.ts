@@ -570,12 +570,16 @@ export interface ProductInfo {
   imageUrl?: string;
   currentPrice: number;
   originalPrice?: number;
+  lowestPrice?: number;
   currency: string;
   rating?: number;
   reviewCount?: number;
   inStock?: boolean;
   seller?: string;
   rawPriceText?: string;
+  rawListPriceText?: string;
+  rawLowPriceText?: string;
+  dealBadge?: string;
   pageReviews?: string[];
 }
 
