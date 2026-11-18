@@ -7,7 +7,17 @@
 
   <p align="center">
     <b>Turn your everyday browser into an AI-powered productivity workstation.</b><br>
-    Chat with any webpage • 1-Click video downloads • Ad & tracker blocking • Clean Copy & Video OCR • Notes & Tasks
+    Chat with any webpage • 1-Click ATS Job & Form Autofill • Video Sniffer • Ad Blocker • Clean Copy & Video OCR
+  </p>
+
+  <!-- ── LIVE PRODUCT SHOWCASE / AD BANNER ── -->
+  <p align="center">
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip" title="Download Free Z-Pilot Extension">
+      <img src="assets/z-pilot-live-showcase.jpg" width="100%" alt="Z-Pilot AI Browser Agent - Live LinkedIn Job Autofill & AI Copilot" style="max-width: 900px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 16px 36px rgba(0,0,0,0.5);" />
+    </a>
+  </p>
+  <p align="center">
+    <sub>⚡ <b>Live In Action:</b> Browsing jobs on LinkedIn with instant 1-Click AI Form Autofill, Resume &amp; Photo Auto-Attach, and Sidepanel Copilot.</sub>
   </p>
 
   <p align="center">
@@ -76,8 +86,8 @@ Instead of opening 10 different tabs or slowing down your computer with 8 separa
       Blocks 50+ ad and tracker networks, collapses blank ad spaces, and auto-skips video ads so pages load noticeably faster.
     </td>
     <td width="50%">
-      <h3>✍️ 1-Click Form Autofill</h3>
-      Scans signup and checkout fields and fills them for you safely — with an instant <b>"Approve & Execute"</b> preview first.
+      <h3>✍️ 1-Click Job &amp; Form Autofill (ATS Ready)</h3>
+      Auto-detects Greenhouse, Lever, Workday, LinkedIn, &amp; general portals. Auto-attaches your stored PDF resume &amp; passport photo, filling 35+ fields in 1 click.
     </td>
   </tr>
   <tr>
@@ -152,8 +162,8 @@ No coding or terminal knowledge required. Follow these 3 simple steps:
 Download the latest bundle and unzip it on your computer:
 
 <p>
-  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.2.0.zip">
-    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.2.0.zip-ea580c?style=flat-square&logo=googlechrome&logoColor=white" height="34" alt="Download ZIP" />
+  <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
+    <img src="https://img.shields.io/badge/⬇️_Download_z--pilot--v2.4.0.zip-ea580c?style=flat-square&logo=googlechrome&logoColor=white" height="34" alt="Download ZIP" />
   </a>
 </p>
 
@@ -228,7 +238,7 @@ Google Chrome, Brave, Microsoft Edge, Opera, Vivaldi, and any Chromium-based bro
   ### 🌟 Ready to upgrade your browser?
 
   <p align="center">
-    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.2.0.zip">
+    <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
       <img src="https://img.shields.io/badge/🚀_GET_STARTED_NOW-FREE_DOWNLOAD-ea580c?style=for-the-badge&logo=rocket&logoColor=white" height="44" alt="Get Started" />
     </a>
   </p>

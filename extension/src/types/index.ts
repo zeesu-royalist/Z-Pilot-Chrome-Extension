@@ -448,7 +448,7 @@ export interface ConverterPreferences {
 
 // ── Clean Copy & Instant Text/Image/Video Extractor (OCR) Types ──
 
-export type CleanCopyTab = 'clean_copy' | 'ocr_extractor';
+export type CleanCopyTab = 'clipboard' | 'clean_copy' | 'ocr_extractor';
 
 export type CaseStyle =
   | 'title'

@@ -35,7 +35,7 @@ export const ApiService = {
       return {
         reply:
           '👋 Welcome to Z-Pilot! To activate your AI browser assistant, please enter your free Google Gemini API Key in Settings ⚙️.\n\nClick the Settings button at the top right to paste your key.',
-        suggestedActions: ['Open Settings', 'How do I get an API key?'],
+        suggestedActions: ['Open Settings', 'Get API'],
         error: true,
       };
     }

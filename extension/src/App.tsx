@@ -8,6 +8,7 @@ import {
   DetectedVideo,
   VideoScanResult,
   VideoDownloadProgress,
+  CleanCopyTab,
 } from './types/index.js';
 import { StorageService } from './services/storage.js';
 import { ApiService } from './services/api.js';
@@ -68,8 +69,14 @@ export const App: React.FC = () => {
   // Currency, Unit & Timezone Converter State
   const [isConverterOpen, setIsConverterOpen] = useState(false);
 
-  // Clean Copy Studio & Image/Video OCR Extractor State
+  // Clean Copy Studio, OCR & Clipboard History State
   const [isCleanCopyOcrOpen, setIsCleanCopyOcrOpen] = useState(false);
+  const [cleanCopyInitialTab, setCleanCopyInitialTab] = useState<CleanCopyTab>('clipboard');
+
+  const handleOpenCleanCopyOcr = (tab: CleanCopyTab = 'clipboard') => {
+    setCleanCopyInitialTab(tab);
+    setIsCleanCopyOcrOpen(true);
+  };
 
   // Web Privacy & Blur Shield State
   const [isPrivacyBlurOpen, setIsPrivacyBlurOpen] = useState(false);
@@ -703,11 +710,11 @@ export const App: React.FC = () => {
         todosCount={todosCount}
         onOpenCalculator={() => setIsCalculatorOpen(true)}
         onOpenConverter={() => setIsConverterOpen(true)}
-        onOpenCleanCopyOcr={() => setIsCleanCopyOcrOpen(true)}
+        onOpenCleanCopyOcr={() => handleOpenCleanCopyOcr('clipboard')}
         onOpenPrivacyBlur={() => setIsPrivacyBlurOpen(true)}
         onOpenShopping={() => setIsShoppingOpen(true)}
-        onOpenClipboard={() => setIsClipboardOpen(true)}
-        onOpenClipBot={() => setIsClipboardOpen(true)}
+        onOpenClipboard={() => handleOpenCleanCopyOcr('clipboard')}
+        onOpenClipBot={() => handleOpenCleanCopyOcr('clipboard')}
         clipsCount={clipsCount}
         onOpenChat={() => {
           setIsChatOpen(true);
@@ -741,11 +748,11 @@ export const App: React.FC = () => {
             todosCount={todosCount}
             onOpenCalculator={() => setIsCalculatorOpen(true)}
             onOpenConverter={() => setIsConverterOpen(true)}
-            onOpenCleanCopyOcr={() => setIsCleanCopyOcrOpen(true)}
+            onOpenCleanCopyOcr={() => handleOpenCleanCopyOcr('clipboard')}
             onOpenPrivacyBlur={() => setIsPrivacyBlurOpen(true)}
             onOpenShopping={() => setIsShoppingOpen(true)}
-            onOpenClipboard={() => setIsClipboardOpen(true)}
-            onOpenClipBot={() => setIsClipboardOpen(true)}
+            onOpenClipboard={() => handleOpenCleanCopyOcr('clipboard')}
+            onOpenClipBot={() => handleOpenCleanCopyOcr('clipboard')}
             clipsCount={clipsCount}
             onOpenAutofillProfile={() => setIsProfileOpen(true)}
             userProfile={profile}
@@ -853,7 +860,7 @@ export const App: React.FC = () => {
         onClose={() => setIsConverterOpen(false)}
       />
 
-      {/* Clean Copy Studio & Image/Video OCR Extractor Panel */}
+      {/* Clean Copy Studio, OCR Extractor & Clipboard History Panel */}
       <CleanCopyOcrPanel
         isOpen={isCleanCopyOcrOpen}
         onClose={() => setIsCleanCopyOcrOpen(false)}
@@ -865,6 +872,8 @@ export const App: React.FC = () => {
         onSendToChat={(text) => handleSendMessage(`Analyze and format this extracted text:\n\n${text}`)}
         currentPageTitle={pageContext?.title}
         currentPageUrl={pageContext?.url}
+        initialTab={cleanCopyInitialTab}
+        onClipsCountChange={(count) => setClipsCount(count)}
       />
 
       {/* Web Privacy & Blur Shield Panel */}

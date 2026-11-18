@@ -147,7 +147,7 @@ export const GeminiClient = {
       return {
         reply:
           '👋 Welcome to Z-Pilot! To activate your AI browser assistant, please enter your free Google Gemini API Key.',
-        suggestedActions: ['Open Settings', 'How do I get an API key?'],
+        suggestedActions: ['Open Settings', 'Get API'],
         error: true,
       };
     }

@@ -8,6 +8,7 @@ import {
   Clock,
   Key,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import { ChatMessage as ChatMessageType, BrowserAction } from '../types/index.js';
 import { ActionPreview } from './ActionPreview.js';
@@ -50,12 +51,20 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
   const handleSuggestionClick = (suggestion: string) => {
     const lower = suggestion.toLowerCase();
-    if ((lower.includes('setting') || lower.includes('key')) && onOpenSettings) {
-      onOpenSettings();
+    if (
+      lower.includes('how do i get an api key') ||
+      lower.includes('google ai studio') ||
+      lower.includes('get api')
+    ) {
+      if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+        chrome.tabs.create({ url: 'https://aistudio.google.com/app/apikey' });
+      } else {
+        window.open('https://aistudio.google.com/app/apikey', '_blank');
+      }
       return;
     }
-    if (lower.includes('how do i get an api key') || lower.includes('google ai studio')) {
-      window.open('https://aistudio.google.com/app/apikey', '_blank');
+    if ((lower.includes('setting') || lower.includes('key')) && onOpenSettings) {
+      onOpenSettings();
       return;
     }
     if (onSelectPrompt) {
@@ -112,15 +121,36 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
               {message.content}
             </div>
 
-            {/* Quick action button inside error bubble */}
-            {isApiKeyIssue && onOpenSettings && (
-              <button
-                onClick={onOpenSettings}
-                className="mt-2.5 inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white text-xs font-semibold transition-all shadow-sm cursor-pointer"
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>Configure API Key</span>
-              </button>
+            {/* Quick action buttons inside error bubble */}
+            {isApiKeyIssue && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    onClick={onOpenSettings}
+                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white text-xs font-semibold transition-all shadow-sm cursor-pointer active:scale-95"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    <span>Configure API Key</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
+                      chrome.tabs.create({ url: 'https://aistudio.google.com/app/apikey' });
+                    } else {
+                      window.open('https://aistudio.google.com/app/apikey', '_blank');
+                    }
+                  }}
+                  title="Open Google AI Studio to get your free Gemini API Key"
+                  className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 hover:border-orange-500/40 text-amber-300 hover:text-amber-200 text-xs font-semibold transition-all shadow-sm cursor-pointer active:scale-95"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Get API</span>
+                </button>
+              </div>
             )}
 
             {/* Action Plan Progress & Steps */}

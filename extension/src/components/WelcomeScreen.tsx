@@ -19,12 +19,12 @@ import {
   Languages,
   CheckSquare,
   Calculator,
-  ClipboardList,
   MessageCircle,
   ShieldCheck,
   ArrowRightLeft,
   ScanText,
   ShoppingBag,
+  UserCheck,
 } from 'lucide-react';
 import { GeminiClient, sanitizeApiKey } from '../services/gemini-client.js';
 import { UserProfile } from '../types/index.js';
@@ -82,8 +82,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onOpenCleanCopyOcr,
   onOpenPrivacyBlur,
   onOpenShopping,
-  onOpenClipboard,
-  onOpenClipBot,
+  onOpenClipboard: _onOpenClipboard,
+  onOpenClipBot: _onOpenClipBot,
   clipsCount = 0,
   onOpenChat,
   unreadChatCount = 0,
@@ -251,8 +251,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       label: 'Clean & OCR',
       icon: ScanText,
       onClick: onOpenCleanCopyOcr,
-      badge: 'AI',
-      title: 'Clean Copy Studio & Image/Video OCR Extractor',
+      badge: clipsCount > 0 ? (clipsCount > 9 ? '9+' : String(clipsCount)) : 'AI',
+      title: 'Clean Copy Studio, OCR Extractor & Clipboard History',
     },
     {
       id: 'privacy_blur',
@@ -271,12 +271,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       title: 'Price Tracker, Fake Review Shield & Coupons',
     },
     {
-      id: 'Clipboard',
-      label: 'Clipboard',
-      icon: ClipboardList,
-      onClick: onOpenClipboard || onOpenClipBot,
-      badge: clipsCount > 0 ? (clipsCount > 9 ? '9+' : String(clipsCount)) : undefined,
-      title: 'Clipboard auto-clipboard history',
+      id: 'autofill',
+      label: 'Form Fill',
+      icon: UserCheck,
+      onClick: onOpenAutofillProfile,
+      badge: 'JOBS',
+      title: 'Job & Form Autofill Profile (35+ Fields, Resume & Photo)',
     },
     {
       id: 'chat',
@@ -471,10 +471,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </div>
         )}
 
-        {/* ── Quick Tools Dock (4x2 Sleek App Launcher) ── */}
+        {/* ── Quick Tools Dock (4x3 Sleek App Launcher) ── */}
         <div>
-          <div className="flex items-center justify-between px-0.5 mb-2">
-          </div>
           <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
             {appLauncherItems.map((item) => (
               <button
@@ -501,8 +499,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         </div>
 
         {/* ── Suggested Actions (2x2 Reference Matching Cards) ── */}
-        <div>
-          <div className="flex items-center justify-between px-0.5 mb-2">
+        <div className="pt-4 sm:pt-6">
+          <div className="flex items-center justify-between px-0.5 mb-2 sm:mb-2.5">
             <span className="text-[11px] font-bold text-white/90 uppercase tracking-wider drop-shadow-sm">
               Suggested Actions
             </span>

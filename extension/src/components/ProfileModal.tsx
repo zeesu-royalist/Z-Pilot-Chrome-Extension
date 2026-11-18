@@ -680,15 +680,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         {activeTab === 'resume' && (
           <div className="space-y-4 animate-fade-in">
             <div className="flex items-center justify-between gap-2.5 min-w-0">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-xs font-semibold text-white">Resume & CV Document</div>
                 <div className="text-[11px] text-white/50 truncate">
                   Store your PDF or Word resume locally • 1-Click auto-attach
                 </div>
               </div>
               {formData.resume?.base64Data && (
-                <span className="text-[10px] px-2.5 py-1 rounded-full font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0 inline-flex items-center space-x-1 select-none">
-                  <span className="leading-none">✓</span>
+                <span className="text-[10px] px-2.5 py-1 rounded-full font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0 inline-flex items-center space-x-1.5 select-none">
+                  <span className="leading-none text-emerald-400 font-bold">✓</span>
                   <span className="leading-none whitespace-nowrap">Resume Stored</span>
                 </span>
               )}
@@ -796,15 +796,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             {/* ── PASSPORT SIZE PHOTO SECTION ── */}
             <div className="pt-2 border-t border-white/10 space-y-3">
               <div className="flex items-center justify-between gap-2.5 min-w-0">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-xs font-semibold text-white">Passport Size Photo / Profile Picture</div>
                   <div className="text-[11px] text-white/50 truncate">
                     JPG, PNG or WebP • Auto-attaches to job application photo inputs
                   </div>
                 </div>
                 {formData.photo?.base64Data && (
-                  <span className="text-[10px] px-2.5 py-1 rounded-full font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0 inline-flex items-center space-x-1 select-none">
-                    <span className="leading-none">✓</span>
+                  <span className="text-[10px] px-2.5 py-1 rounded-full font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0 inline-flex items-center space-x-1.5 select-none">
+                    <span className="leading-none text-emerald-400 font-bold">✓</span>
                     <span className="leading-none whitespace-nowrap">Photo Stored</span>
                   </span>
                 )}
