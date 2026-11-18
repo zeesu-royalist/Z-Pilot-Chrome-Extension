@@ -154,12 +154,23 @@ Instead of opening 10 different tabs or slowing down your computer with 8 separa
 
 ---
 
-## 🚀 Quick Install (In 1 Minute!)
+## 🚀 Quick Install (Instant 1-Click Drag & Drop!)
 
-No coding or terminal knowledge required. Follow these 3 simple steps:
+No coding or terminal knowledge required. Choose the easiest option for you:
 
-### 1️⃣ Step 1: Download & Unzip
-Download the latest bundle and unzip it on your computer:
+### ⚡ Option A: Instant Drag & Drop (Zero Extracting Needed!)
+If you have cloned or downloaded this repository, the pre-built folder is already unpacked and ready to use:
+
+1. Open **`chrome://extensions`** in your browser.
+   *(Using Brave? `brave://extensions` • Using Edge? `edge://extensions`)*
+2. In the top-right corner, **turn ON "Developer mode"**.
+3. **Drag & Drop** the folder **[`release/z-pilot-v2.4.0`](release/z-pilot-v2.4.0)** directly into your extensions page!
+4. Click the puzzle icon (🧩) and **Pin (📌) Z-Pilot** to your toolbar. 🎉 **Ready to use in 5 seconds!**
+
+---
+
+### 📦 Option B: 1-Click Download Bundle
+Prefer a single file download? Click the direct bundle link below:
 
 <p>
   <a href="https://raw.githubusercontent.com/zeesu-royalist/Z-Pilot-Chrome-Extension/main/release/z-pilot-v2.4.0.zip">
@@ -167,27 +178,10 @@ Download the latest bundle and unzip it on your computer:
   </a>
 </p>
 
----
-
-### 2️⃣ Step 2: Open Extensions in Your Browser
-Copy the link below, paste it into your browser address bar, and press **Enter**:
-
-```text
-chrome://extensions
-```
-
-> 💡 **Using Brave?** Use `brave://extensions` &nbsp;•&nbsp; **Using Edge?** Use `edge://extensions`
-
-👉 In the top-right corner, **turn ON the "Developer mode" switch**.
-
----
-
-### 3️⃣ Step 3: Load & Pin
-1. Click the **"Load unpacked"** button on the top-left.
-2. Select the unzipped folder from Step 1.
-3. Click the browser puzzle icon (🧩) and **Pin (📌) Z-Pilot** to your toolbar.
-
-🎉 **Done! Click the Z-Pilot icon to open your side panel.**
+1. Download the ZIP file above (macOS Safari automatically unpacks it directly to your Downloads folder).
+2. Open **`chrome://extensions`** and toggle **"Developer mode"** ON.
+3. Click **"Load unpacked"** and select the folder, or simply drag & drop the unzipped folder into your browser window.
+4. Pin (📌) Z-Pilot and start browsing with superpowers!
 
 ---
 
