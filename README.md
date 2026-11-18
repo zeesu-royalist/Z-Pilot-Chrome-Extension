@@ -170,8 +170,7 @@ Click to download the latest ultra-lightweight ZIP bundle (~360 KB):
   </a>
 </p>
 
-> 💡 *Unzip the downloaded file on your computer.*  
-> *(Cloned the repo? The pre-built unpacked folder is already available at [`release/z-pilot-v2.4.0`](https://github.com/zeesu-royalist/Z-Pilot-Chrome-Extension/tree/main/release/z-pilot-v2.4.0) — zero unzipping needed!)*
+> 💡 *Unzip the downloaded file on your computer (macOS automatically unpacks it directly to your Downloads folder).*
 
 ---
 
