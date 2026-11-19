@@ -1,5 +1,12 @@
 import React, { useRef, useEffect } from 'react';
-import { SendHorizontal, Globe, Square, Shield, AlertTriangle, Paperclip } from 'lucide-react';
+import {
+  SendHorizontal,
+  Globe,
+  Square,
+  Shield,
+  AlertTriangle,
+  Paperclip,
+} from 'lucide-react';
 import { PageContext } from '../types/index.js';
 import { isRestrictedUrl } from '../services/browser-actions.js';
 
@@ -70,7 +77,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       </div>
 
-      {/* Floating Capsule Bar (Screenshot 2 exact match) */}
+      {/* Floating Capsule Bar */}
       <div className="relative flex items-center rounded-full bg-black/70 border border-white/15 focus-within:border-orange-500/50 backdrop-blur-xl px-3.5 py-2 shadow-2xl shadow-black/90 transition-all">
         {/* Left Paperclip icon button */}
         <button
@@ -96,25 +103,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           className="w-full resize-none bg-transparent px-3 py-0.5 text-xs text-white placeholder-white/45 focus:outline-none max-h-24 leading-relaxed font-sans"
         />
 
-        {/* Right Send/Stop Action (Always Centered) */}
+        {/* Right Action Button: Send or Stop */}
         <div className="flex items-center shrink-0">
           {isLoading && onStop ? (
             <button
               onClick={onStop}
               title="Stop action"
-              className="w-8 h-8 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
             >
               <Square className="w-3.5 h-3.5 fill-current" />
             </button>
           ) : (
             <button
-              onClick={onSend}
-              disabled={!input.trim() || disabled}
+              type="button"
+              onClick={() => onSend()}
+              disabled={disabled || !input.trim() || isLoading}
               title="Send message (Enter)"
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${
-                input.trim() && !disabled
-                  ? 'bg-gradient-to-tr from-[#EA580C] to-[#FB923C] hover:from-[#F97316] hover:to-[#FED7AA] text-white shadow-orange-600/40 active:scale-95'
-                  : 'bg-white/10 text-white/30 cursor-not-allowed'
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                input.trim() && !disabled && !isLoading
+                  ? 'bg-gradient-to-tr from-[#EA580C] to-[#FB923C] hover:from-[#F97316] hover:to-[#FED7AA] text-white shadow-md shadow-orange-600/40 cursor-pointer'
+                  : 'bg-white/10 text-white/30 cursor-not-allowed shadow-none'
               }`}
             >
               <SendHorizontal className="w-4 h-4 translate-x-[0.5px] stroke-[2.2]" />

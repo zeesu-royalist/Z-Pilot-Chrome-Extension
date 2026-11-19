@@ -921,8 +921,8 @@ export const App: React.FC = () => {
           />
         </div>
       ) : (
+        /* Main Chat Conversation Area (Screenshot 2) */
         <>
-          {/* Main Chat Conversation Area (Screenshot 2) */}
           <ChatWindow
             messages={messages}
             isLoading={isLoading}
@@ -937,7 +937,7 @@ export const App: React.FC = () => {
             isExecutingAction={isExecutingPlan}
           />
 
-          {/* Floating Bottom Input Bar (Screenshot 2) */}
+          {/* Floating Bottom Input Bar (Only in active conversation) */}
           <ChatInput
             input={input}
             setInput={setInput}

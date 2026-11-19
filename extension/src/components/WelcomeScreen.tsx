@@ -619,8 +619,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           <button
             type="button"
             onClick={() => handleHomeSubmit()}
-            title="Send message"
-            className="w-10 h-10 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white flex items-center justify-center shadow-lg shadow-orange-600/40 hover:shadow-orange-500/50 transition-all cursor-pointer active:scale-90"
+            disabled={!homeInput.trim()}
+            title="Send message (Enter)"
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 ${
+              homeInput.trim()
+                ? 'bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white shadow-lg shadow-orange-600/40 hover:shadow-orange-500/50 cursor-pointer'
+                : 'bg-white/10 text-white/30 cursor-not-allowed shadow-none'
+            }`}
           >
             <SendHorizontal className="w-4 h-4 stroke-[2.2] translate-x-[0.5px]" />
           </button>
