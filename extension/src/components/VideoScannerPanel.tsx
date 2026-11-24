@@ -21,7 +21,7 @@ import {
   VideoScanResult,
 } from '../types/index.js';
 import { formatBytes, formatDuration, dedupeToBestPerVideo } from '../services/video-deduper.js';
-import { Y2MATE_YOUTUBE_URL } from '../services/y2mate-autofill.js';
+import { Y2MATE_YOUTUBE_URL, SAVEFROM_INSTAGRAM_URL } from '../services/y2mate-autofill.js';
 
 interface VideoScannerPanelProps {
   isOpen: boolean;
@@ -172,6 +172,54 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
     );
   }, [videos, activeFilter]);
 
+  const isInstagram = useMemo(() => {
+    return /instagram\.com/i.test(ytUrlInput) || /instagram\.com/i.test(scanResult?.pageUrl || '');
+  }, [ytUrlInput, scanResult?.pageUrl]);
+
+  const isYouTube = useMemo(() => {
+    if (isInstagram) return false;
+    return (
+      /youtube\.com|youtu\.be/i.test(ytUrlInput) ||
+      /youtube\.com|youtu\.be/i.test(scanResult?.pageUrl || '') ||
+      Boolean(scanResult?.isYouTube)
+    );
+  }, [isInstagram, ytUrlInput, scanResult?.pageUrl, scanResult?.isYouTube]);
+
+  const activeDownloaderUrl = isInstagram ? SAVEFROM_INSTAGRAM_URL : (isYouTube ? Y2MATE_YOUTUBE_URL : SAVEFROM_INSTAGRAM_URL);
+  const activeDownloaderDomain = (isInstagram || !isYouTube) ? 'en1.savefrom.net' : 'v42.www-y2mate.com';
+
+  const cardTitle = isInstagram
+    ? 'Download Instagram Video / Reel in HD'
+    : isYouTube
+    ? "Why 720p / 1080p / 4K isn't shown here"
+    : 'Download in 720p / 1080p / 4K or MP3';
+
+  const cardDescription = isInstagram
+    ? 'Instagram restricts direct video downloads through browsers. To download high quality videos or reels, click below.'
+    : isYouTube
+    ? 'YouTube restricts HD video downloads through browsers. To download high quality videos, click below.'
+    : 'Websites often restrict direct HD video downloads through browsers. To download high quality videos, click below.';
+
+  const cardPlaceholder = isInstagram
+    ? 'https://www.instagram.com/p/...'
+    : isYouTube
+    ? 'https://www.youtube.com/watch?v=...'
+    : 'https://...';
+
+  const buttonLabel = isInstagram
+    ? 'Open In SaveFrom (HD)'
+    : isYouTube
+    ? 'Open For High Quality'
+    : 'Open In SaveFrom (HD)';
+
+  const openingLabel = isYouTube
+    ? 'Opening Y2mate & Auto-Filling...'
+    : 'Opening SaveFrom & Auto-Filling...';
+
+  const copiedLabel = isYouTube
+    ? 'Link Copied & Y2mate Opened'
+    : 'Link Copied & SaveFrom Opened';
+
   if (!isOpen) return null;
 
   const handleCopyUrl = (video: DetectedVideo) => {
@@ -199,11 +247,16 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
     // Copy as handy backup in case user needs it manually
     navigator.clipboard?.writeText(targetVideoUrl).catch(() => { });
 
+    const isInsta = /instagram\.com/i.test(targetVideoUrl);
+    const isYt = !isInsta && (/youtube\.com|youtu\.be/i.test(targetVideoUrl) || Boolean(scanResult?.isYouTube));
+    const actionType = isYt ? 'OPEN_Y2MATE_WITH_URL' : 'OPEN_SAVEFROM_WITH_URL';
+    const fallbackBaseUrl = isYt ? Y2MATE_YOUTUBE_URL : SAVEFROM_INSTAGRAM_URL;
+
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       setIsOpeningY2mate(true);
       chrome.runtime.sendMessage(
         {
-          type: 'OPEN_Y2MATE_WITH_URL',
+          type: actionType,
           targetVideoUrl,
         },
         () => {
@@ -215,7 +268,7 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
       return;
     }
 
-    const fallbackUrl = `${Y2MATE_YOUTUBE_URL}#url=${encodeURIComponent(targetVideoUrl)}`;
+    const fallbackUrl = `${fallbackBaseUrl}#url=${encodeURIComponent(targetVideoUrl)}`;
     window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -584,8 +637,8 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
           );
         })}
 
-        {/* YouTube HD Notice & 1-Click Auto-Fill Y2mate Card */}
-        {!isScanning && !scanResult?.error && scanResult?.isYouTube && (
+        {/* Universal HD Downloader Card (Y2mate for YouTube, SaveFrom for Instagram & Web) */}
+        {!isScanning && !scanResult?.error && (
           <div className="p-3.5 rounded-xl bg-[#120502] border border-orange-500/25 shadow-lg space-y-2.5 overflow-hidden">
             <div className="flex items-start space-x-2.5">
               <div className="w-6 h-6 rounded-lg bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-400 shrink-0 mt-0.5">
@@ -594,20 +647,20 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
               <div className="space-y-1 min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <h3 className="text-xs font-semibold text-white leading-snug">
-                    Why 720p / 1080p / 4K isn&apos;t shown here
+                    {cardTitle}
                   </h3>
                   <a
-                    href={Y2MATE_YOUTUBE_URL}
+                    href={activeDownloaderUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="text-orange-400 hover:text-orange-300 underline underline-offset-2 font-mono text-[11px] inline-flex items-center gap-0.5 font-medium shrink-0"
                   >
-                    <span>v42.www-y2mate.com</span>
+                    <span>{activeDownloaderDomain}</span>
                     <ArrowUpRight className="w-3 h-3 shrink-0" />
                   </a>
                 </div>
                 <p className="text-[11px] text-white/60 leading-normal">
-                  YouTube restricts HD video downloads through browsers. To download high quality videos, click below.
+                  {cardDescription}
                 </p>
               </div>
             </div>
@@ -618,13 +671,13 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
                 type="url"
                 value={ytUrlInput}
                 onChange={(e) => setYtUrlInput(e.target.value)}
-                aria-label="YouTube video link"
-                placeholder="https://www.youtube.com/watch?v=..."
+                aria-label={isInstagram ? 'Instagram video link' : isYouTube ? 'YouTube video link' : 'Video link'}
+                placeholder={cardPlaceholder}
                 className="bg-transparent text-[11px] font-mono text-white/85 flex-1 min-w-0 focus:outline-none"
               />
               <button
                 onClick={handleCopyPageLink}
-                title="Copy YouTube link"
+                title={isInstagram ? 'Copy Instagram link' : isYouTube ? 'Copy YouTube link' : 'Copy link'}
                 className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[10px] font-medium text-white/85 hover:text-white flex items-center gap-1 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
               >
                 {linkCopied ? (
@@ -649,17 +702,17 @@ export const VideoScannerPanel: React.FC<VideoScannerPanelProps> = ({
               {isOpeningY2mate ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span className="whitespace-nowrap">Opening Y2mate &amp; Auto-Filling...</span>
+                  <span className="whitespace-nowrap">{openingLabel}</span>
                 </>
               ) : linkCopied ? (
                 <>
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span className="whitespace-nowrap">Link Copied &amp; Y2mate Opened</span>
+                  <span className="whitespace-nowrap">{copiedLabel}</span>
                 </>
               ) : (
                 <>
                   <ExternalLink className="w-3.5 h-3.5" />
-                  <span className="whitespace-nowrap">Open For High Quality</span>
+                  <span className="whitespace-nowrap">{buttonLabel}</span>
                 </>
               )}
             </button>

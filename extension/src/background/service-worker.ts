@@ -8,6 +8,7 @@ import { inspectNetworkMedia, TabMediaStore } from '../services/media-sniffer.js
 import {
   autoFillY2matePage,
   Y2MATE_YOUTUBE_URL,
+  SAVEFROM_INSTAGRAM_URL,
 } from '../services/y2mate-autofill.js';
 import { StorageService } from '../services/storage.js';
 import { AdBlockerService } from '../services/ad-blocker.js';
@@ -725,14 +726,17 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         return false;
       }
 
-      const destinationUrl = `${Y2MATE_YOUTUBE_URL}#url=${encodeURIComponent(targetVideoUrl)}`;
+      const isInstagram = /instagram\.com/i.test(targetVideoUrl);
+      const isSaveFrom = request.type === 'OPEN_SAVEFROM_WITH_URL' || isInstagram;
+      const baseDownloaderUrl = isSaveFrom ? SAVEFROM_INSTAGRAM_URL : Y2MATE_YOUTUBE_URL;
+      const destinationUrl = `${baseDownloaderUrl}#url=${encodeURIComponent(targetVideoUrl)}`;
 
       (async () => {
         try {
           const createdTab = await chrome.tabs.create({ url: destinationUrl, active: true });
           const targetTabId = createdTab.id;
           if (!targetTabId) {
-            sendResponse({ success: false, error: 'Failed to open Y2mate tab' });
+            sendResponse({ success: false, error: 'Failed to open downloader tab' });
             return;
           }
 

@@ -185,13 +185,22 @@ Click to download the latest ultra-lightweight ZIP bundle (~370 KB):
 ---
 
 ### 2️⃣ Step 2: Open Extensions in Your Browser
-Copy the link below, paste it into your browser address bar, and press **Enter**:
+Copy the URL for your browser below (click the copy button in the top-right of the box), paste it into your address bar, and press **Enter**:
 
+**🌐 Google Chrome:**
 ```text
 chrome://extensions
 ```
 
-> 💡 **Using Brave?** Use `brave://extensions` &nbsp;•&nbsp; **Using Edge?** Use `edge://extensions`
+**🦁 Brave Browser:**
+```text
+brave://extensions
+```
+
+**🌊 Microsoft Edge:**
+```text
+edge://extensions
+```
 
 👉 In the top-right corner, **turn ON the "Developer mode" switch**.
 

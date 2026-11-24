@@ -282,6 +282,95 @@ describe('Z-Pilot v2 integration: planner, scanner, downloader & UI', () => {
     });
   });
 
+  it('renders SaveFrom HD card for Instagram URLs and sends OPEN_SAVEFROM_WITH_URL', async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    const sendMessageMock = vi.fn((_msg: any, cb?: (res: any) => void) => {
+      if (cb) cb({ success: true });
+    });
+    vi.stubGlobal('navigator', {
+      clipboard: { writeText: writeTextMock },
+    });
+    vi.stubGlobal('chrome', {
+      runtime: { sendMessage: sendMessageMock },
+    });
+
+    const instaUrl = 'https://www.instagram.com/p/DgAAywhv79h/';
+    const scanResult: VideoScanResult = {
+      tabId: 101,
+      pageUrl: instaUrl,
+      pageTitle: 'Instagram post',
+      scannedAt: Date.now(),
+      scanDurationMs: 40,
+      isYouTube: false,
+      sourcesChecked: {
+        domFrames: 1,
+        networkEntries: 0,
+        youtubeExtracted: false,
+        hlsVariantsExpanded: 0,
+      },
+      videos: [],
+    };
+
+    render(
+      React.createElement(VideoScannerPanel, {
+        isOpen: true,
+        onClose: vi.fn(),
+        isScanning: false,
+        scanResult,
+        progressMap: {},
+        onScan: vi.fn(),
+        onDownload: vi.fn(),
+        onCancelDownload: vi.fn(),
+      })
+    );
+
+    expect(screen.getByText(/Download Instagram Video \/ Reel in HD/i)).toBeTruthy();
+    expect(screen.getByText('en1.savefrom.net')).toBeTruthy();
+
+    const openBtn = screen.getByText(/Open In SaveFrom \(HD\)/i);
+    expect(openBtn).toBeTruthy();
+
+    fireEvent.click(openBtn);
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith(instaUrl);
+      expect(sendMessageMock).toHaveBeenCalledWith(
+        {
+          type: 'OPEN_SAVEFROM_WITH_URL',
+          targetVideoUrl: instaUrl,
+        },
+        expect.any(Function)
+      );
+    });
+  });
+
+  it('autoFillY2matePage works with SaveFrom #sf_url and #sf_submit selectors', async () => {
+    document.body.innerHTML = `
+      <form id="sf_form">
+        <input id="sf_url" name="sf_url" type="text" />
+        <button id="sf_submit" class="sf-btn" type="submit">Download</button>
+      </form>
+    `;
+
+    const inputEl = document.getElementById('sf_url') as HTMLInputElement;
+    const submitBtn = document.getElementById('sf_submit') as HTMLButtonElement;
+    const onInput = vi.fn();
+    const onChange = vi.fn();
+    const onSubmitClick = vi.fn((e: Event) => e.preventDefault());
+
+    inputEl.addEventListener('input', onInput);
+    inputEl.addEventListener('change', onChange);
+    submitBtn.addEventListener('click', onSubmitClick);
+
+    const instaUrl = 'https://www.instagram.com/p/DgAAywhv79h/';
+    const result = await autoFillY2matePage(instaUrl);
+
+    expect(result).toEqual({ filled: true, submitted: true });
+    expect(inputEl.value).toBe(instaUrl);
+    expect(onInput).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onSubmitClick).toHaveBeenCalledTimes(1);
+  });
+
   it('autoFillY2matePage fills #txt-url, fires input/change events, and clicks #btn-submit', async () => {
     document.body.innerHTML = `
       <form id="search-form">

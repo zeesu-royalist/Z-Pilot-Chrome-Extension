@@ -1,7 +1,8 @@
 export const Y2MATE_YOUTUBE_URL = 'https://v42.www-y2mate.com/';
+export const SAVEFROM_INSTAGRAM_URL = 'https://en1.savefrom.net/19wr/';
 
 /**
- * Self-contained DOM autofill script injected into https://v42.www-y2mate.com/ via
+ * Self-contained DOM autofill script injected into Y2mate (YouTube) or SaveFrom (Instagram/Web) via
  * chrome.scripting.executeScript(). Must have zero external runtime dependencies.
  */
 export async function autoFillY2matePage(
@@ -10,16 +11,20 @@ export async function autoFillY2matePage(
   if (!targetUrl) return { filled: false, submitted: false };
 
   const selectors = [
+    '#sf_url',
+    'input[name="sf_url"]',
+    'input#sf_url',
+    '.sf_url',
     '#txt-url',
     'input[name="url"]',
     'input[name="txt-url"]',
-    '#sf_url',
     'input[type="url"]',
     'input[placeholder*="link" i]',
     'input[placeholder*="url" i]',
     'input[placeholder*="paste" i]',
     'input[placeholder*="search" i]',
     'input[placeholder*="youtube" i]',
+    'input[placeholder*="instagram" i]',
     'form input[type="text"]',
   ];
 
@@ -65,12 +70,14 @@ export async function autoFillY2matePage(
 
   const form = inputEl.closest('form');
   const submitBtn =
+    (document.querySelector('#sf_submit') as HTMLElement | null) ||
+    (document.querySelector('.sf-btn') as HTMLElement | null) ||
+    (document.querySelector('button.sf-btn') as HTMLElement | null) ||
     (document.querySelector('#btn-submit') as HTMLElement | null) ||
     (document.querySelector('button[id="btn-submit"]') as HTMLElement | null) ||
     (document.querySelector('.btn-red') as HTMLElement | null) ||
-    (document.querySelector('#sf_submit') as HTMLElement | null) ||
     (form?.querySelector(
-      'button[type="submit"], input[type="submit"], button#btn-submit, .btn-red, .submit'
+      'button[type="submit"], input[type="submit"], button#btn-submit, .btn-red, .submit, #sf_submit, .sf-btn'
     ) as HTMLElement | null) ||
     (document.querySelector('button[type="submit"], input[type="submit"]') as HTMLElement | null);
 
